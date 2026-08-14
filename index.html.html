@@ -1042,7 +1042,7 @@ function renderHome(){
 function entryCardHtml(e){
   const m = moodOf(e.mood), w = weatherOf(e.weather);
   return `
-    <div class="entry-card paper-card p-4 cursor-pointer" data-id="${e.id}">
+    <div class="entry-card paper-card p-4 cursor-pointer" data-id="${e.id}" style="background:#f7edf1;">
       <div class="flex items-start justify-between mb-2">
         <div>
           <p class="text-xs" style="color:var(--text-muted)">${formatDateKR(e.date, false)}</p>
