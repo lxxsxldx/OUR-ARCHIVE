@@ -1,5 +1,4 @@
 
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -343,7 +342,6 @@ function rowToEntry(r){
 const DB = (() => {
   const K_DRAFT = 'diary_draft_v1';
   const K_THEME = 'diary_theme_v1';
-  const K_SEEDED = 'diary_seeded_v1';
   const K_FORTUNE = 'diary_fortune_input_v1';
   
 
@@ -410,9 +408,6 @@ const DB = (() => {
     if(error) throw error;
   }
 
-  function hasSeeded(userId){ return !!localStorage.getItem(K_SEEDED + ':' + userId); }
-  function markSeeded(userId){ localStorage.setItem(K_SEEDED + ':' + userId, '1'); }
-
   function getDraft(){
     try{
       const raw = localStorage.getItem(K_DRAFT);
@@ -437,7 +432,6 @@ const DB = (() => {
   return {
     getSession, signUp, signIn, signOut,
     fetchEntries, insertEntry, updateEntry, deleteEntry,
-    hasSeeded, markSeeded,
     getDraft, saveDraft, clearDraft, getTheme, setTheme,
     getFortuneInput, saveFortuneInput,
   };
@@ -676,43 +670,6 @@ function highlightText(str, term){
   }catch(e){ return esc; }
 }
 
-/* ---------------- 샘플 데이터 (최초 로그인 시 1회 Supabase에 삽입) ---------------- */
-async function seedSampleData(userId){
-  const now = new Date();
-  const d = (offset) => { const dt = new Date(now); dt.setDate(dt.getDate() - offset); return toDateStr(dt); };
-  const sample = [
-    {
-      id: newId(), date: d(2), title:'Seeing an old friend',
-      content:"Met a friend I hadn't seen in months. I was worried it might feel awkward, but the moment we saw each other it was easy again, just like before. A good reminder of how much time with the people I love actually means. We promised not to wait so long next time.",
-      mood:'excited', weather:'sunny', tags:['friends','plans','cafe'], images:[],
-      createdAt: new Date(now-2*864e5).toISOString(), updatedAt: new Date(now-2*864e5).toISOString(),
-    },
-    {
-      id: newId(), date: d(5), title:'A tiring day',
-      content:"Everything kept piling up and I felt rushed all day. Things didn't go as planned and I was a little disappointed in myself, but I still want to give myself credit for pushing through to the end. Tomorrow I'll try to plan with a bit more breathing room.",
-      mood:'down', weather:'rainy', tags:['work','resolve'], images:[],
-      createdAt: new Date(now-5*864e5).toISOString(), updatedAt: new Date(now-5*864e5).toISOString(),
-    },
-    {
-      id: newId(), date: d(9), title:'By the window on a rainy day',
-      content:"Listened to the rain outside with some music on and a good book in hand. Nothing special happened, but it was a quietly good day. I'm learning that on days like this, doing nothing at all can be more than enough.",
-      mood:'calm', weather:'rainy', tags:['reading','music','rest'], images:[],
-      createdAt: new Date(now-9*864e5).toISOString(), updatedAt: new Date(now-9*864e5).toISOString(),
-    },
-    {
-      id: newId(), date: d(13), title:'A small win',
-      content:"Finally finished something I'd been putting off! It wasn't a big deal, but just getting it done put me in a great mood. Trying to remember to celebrate small wins as much as the big ones.",
-      mood:'happy', weather:'sunny', tags:['win','resolve'], images:[],
-      createdAt: new Date(now-13*864e5).toISOString(), updatedAt: new Date(now-13*864e5).toISOString(),
-    },
-  ];
-  const inserted = [];
-  for(const e of sample){
-    try{ inserted.push(await DB.insertEntry(e, userId)); }catch(err){ console.error('seed insert failed', err); }
-  }
-  return inserted;
-}
-
 /* ---------------- 전역 상태 ---------------- */
 const state = {
   view: 'home',
@@ -940,11 +897,7 @@ async function boot(){
 async function afterAuth(user){
   state.userId = user.id;
   state.username = (user.user_metadata && user.user_metadata.username) || '';
-  let entries = await DB.fetchEntries(user.id);
-  if(entries.length === 0 && !DB.hasSeeded(user.id)){
-    entries = await seedSampleData(user.id);
-    DB.markSeeded(user.id);
-  }
+  const entries = await DB.fetchEntries(user.id);
   state.entries = entries;
   state.booting = false;
   state.view = 'home';
@@ -1211,7 +1164,7 @@ function entryCardHtml(e){
         </div>
         <span class="text-sm">${w?w.emoji:''}</span>
       </div>
-      ${e.images && e.images.length ? `<div class="mt-3 flex gap-2">${e.images.slice(0,3).map(img=>`<img src="${img}" class="w-24 h-24 rounded-lg object-cover" style="border:1px solid var(--border-soft);"/>`).join('')}</div>`:''}
+      ${e.images && e.images.length ? `<div class="mt-3 flex gap-2">${e.images.slice(0,3).map(img=>`<img src="${img}" class="w-32 h-32 rounded-lg object-cover" style="border:1px solid var(--border-soft);"/>`).join('')}</div>`:''}
     </div>
   `;
 }
@@ -1683,7 +1636,7 @@ function renderDetail(){
           <span>· 마지막 수정 ${formatDateTimeKR(e.updatedAt)}</span>
         </div>
         <p class="whitespace-pre-wrap leading-8 mb-6" style="color:var(--text);">${escapeHtml(e.content)}</p>
-        ${e.images && e.images.length ? `<div class="flex flex-wrap gap-2 mb-6">${e.images.map(img=>`<img src="${img}" class="w-28 h-28 rounded-xl object-cover" style="border:1px solid var(--border-soft);"/>`).join('')}</div>` : ''}
+        ${e.images && e.images.length ? `<div class="flex flex-wrap gap-2 mb-6">${e.images.map(img=>`<img src="${img}" class="w-48 h-48 rounded-xl object-cover" style="border:1px solid var(--border-soft);"/>`).join('')}</div>` : ''}
         ${e.tags && e.tags.length ? `<div class="flex flex-wrap gap-2 mb-6">${e.tags.map(t=>`<span class="chip">#${escapeHtml(t)}</span>`).join('')}</div>` : ''}
         <div class="stitch mb-6"></div>
         <div class="flex gap-2">
