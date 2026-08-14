@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -482,29 +481,6 @@ const QUOTES = [
   '서두르지 않아도 나는 나아가고 있다.',
   '마음이 복잡한 날엔 짧은 산책을 해보자.',
   '나를 위한 위로의 말 한마디를 건네보자.',
-  '힘든 하루의 끝에도 나는 여전히 나다.',
-  '오늘의 감정을 있는 그대로 적어보자.',
-  '나를 다그치는 마음의 소리를 줄여보기.',
-  '잘 견뎌낸 오늘의 나에게 고맙다고 말하기.',
-  '완벽하지 않아도 사랑받을 자격이 있다.',
-  '오늘 하루도 무사히 지나갔다는 것에 감사하자.',
-  '나를 향한 기준을 조금 낮춰도 괜찮다.',
-  '지금의 나도 충분히 잘하고 있다.',
-  '힘든 감정도 언젠가는 흘러간다.',
-  '오늘 하루, 나에게 친절한 사람이 되어보자.',
-  '마음의 여유가 곧 나를 지키는 힘이다.',
-  '나를 소중히 여기는 하루를 보내보자.',
-  '조금 서툴러도 그게 나만의 속도다.',
-  '오늘의 노력이 헛되지 않았음을 믿는다.',
-  '나를 다정하게 바라보는 연습을 계속하자.',
-  '힘들었던 오늘도 결국 지나갈 것이다.',
-  '나만의 기준으로 오늘을 평가해보자.',
-  '작은 위로도 큰 힘이 될 수 있다.',
-  '오늘 하루의 감정을 인정해주는 것부터 시작하자.',
-  '나를 향한 비교의 시선을 거두어보자.',
-  '마음이 지친 날엔 나에게 쉼을 선물하자.',
-  '오늘도 나답게 살아낸 나를 칭찬하자.',
-  '완벽함보다 꾸준함이 더 오래간다.',
   '힘든 하루 속에서도 작은 기쁨을 찾아보자.',
   '나를 이해해주는 사람은 결국 나 자신이다.',
   '오늘의 나에게 조금 더 너그러워지기.',
@@ -927,8 +903,31 @@ function renderHome(){
         <p id="home-quote" class="text-2sm" style="color:#ffffff;-webkit-text-stroke:0.5px #000000; transition:opacity .4s ease, transform .4s ease;">"${QUOTES[state.quoteIndex]}"</p>
       </div>
 
+      ${todayEntry ? `
+        <button id="go-today-entry" class="link-cta">오늘을 되짚어보기 →</button>
+      ` : `
+        <div class="paper-card p-5 mb-4" style="background:var(--bg-soft); border-style:dashed;">
+          <p class="text-sm mb-3" style="color:var(--text-muted)">📝 무형의 생각을 유형의 기록으로 남겨주세요</p>
+          <button id="go-write-today" class="btn-primary">Write Today's Entry</button>
+        </div>
+      `}
+
+      <div class="stitch my-8"></div>
+
+      <p class="text-sm font-semibold mb-3" style="color:var(--text)">오늘 기분 어때?</p>
+      <div class="flex flex-wrap gap-3 mb-2" id="quick-mood-row">
+        ${MOODS.map(m => `
+          <button class="mood-pick ${state.quickMood===m.key?'selected':''}" data-quick-mood="${m.key}">
+            <span class="emoji">${m.emoji}</span><span class="label">${m.label}</span>
+          </button>`).join('')}
+      </div>
+      <p class="text-xs mb-6" style="color:var(--text-muted)">Pick one and it'll pre-fill your mood when you start writing.</p>
+
+      <!-- 상단 스티치 구분선 -->
+      <div class="stitch my-8"></div>
+
       <!-- 오늘의 운세 카드 -->
-      <div class="paper-card p-5 mb-6" style="background:var(--surface);">
+      <div class="paper-card p-5 my-6" style="background:var(--surface);">
         <div class="flex items-center justify-between mb-3">
           <h2 class="font-hand text-xl flex items-center gap-2" style="color:var(--text)">
             <span>🔮</span> 오늘의 운세
@@ -962,28 +961,9 @@ function renderHome(){
         `}
       </div>
 
-      ${todayEntry ? `
-        <button id="go-today-entry" class="link-cta">오늘을 되짚어보기 →</button>
-      ` : `
-        <div class="paper-card p-5 mb-4" style="background:var(--bg-soft); border-style:dashed;">
-          <p class="text-sm mb-3" style="color:var(--text-muted)">📝 무형의 생각을 유형의 기록으로 남겨주세요</p>
-          <button id="go-write-today" class="btn-primary">Write Today's Entry</button>
-        </div>
-      `}
-
+      <!-- 하단 스티치 구분선 -->
       <div class="stitch my-8"></div>
-
-      <p class="text-sm font-semibold mb-3" style="color:var(--text)">오늘 기분 어때?</p>
-      <div class="flex flex-wrap gap-3 mb-2" id="quick-mood-row">
-        ${MOODS.map(m => `
-          <button class="mood-pick ${state.quickMood===m.key?'selected':''}" data-quick-mood="${m.key}">
-            <span class="emoji">${m.emoji}</span><span class="label">${m.label}</span>
-          </button>`).join('')}
-      </div>
-      <p class="text-xs" style="color:var(--text-muted)">Pick one and it'll pre-fill your mood when you start writing.</p>
     </section>
-
-    <div class="stitch mb-8"></div>
 
     <section class="fade-in">
       <div class="flex items-center justify-between mb-4">
