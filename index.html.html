@@ -12,6 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gugi&family=Noto+Sans+KR:wght@300;400;500;600;700;800&family=Sekuya&display=swap" rel="stylesheet">
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{
   --bg:#86f7fd;
@@ -280,24 +281,101 @@ kbd{
 
 <script>
 /* =========================================================
-   오늘의 기록 — 감성 일기 (localStorage 기반 SPA, vanilla JS)
+   오늘의 기록 — 감성 일기 (Supabase 연동 SPA, vanilla JS)
    ========================================================= */
 
-/* ---------------- 데이터 계층 (추후 백엔드 교체 용이하게 UI와 분리) ---------------- */
+/* ---------------- Supabase 설정 ---------------- */
+const SUPABASE_URL = 'https://mnsqolfpcrgebyglumhn.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_ilQa7jVU9PHGY8Jx88I-Xw_K6t5hOch';
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const ENTRIES_TABLE = 'logs';
+
+function newId(){
+  if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random()*16|0, v = c==='x'?r:(r&0x3|0x8);
+    return v.toString(16);
+  });
+}
+
+/* entry(앱 형식) <-> row(DB 형식) 매핑 */
+function entryToRow(e, userId){
+  return {
+    id: e.id,
+    user_id: userId,
+    date: e.date,
+    title: e.title || '',
+    content: e.content || '',
+    mood: e.mood || null,
+    weather: e.weather || null,
+    tags: e.tags || [],
+    images: e.images || [],
+    created_at: e.createdAt,
+    updated_at: e.updatedAt,
+  };
+}
+function rowToEntry(r){
+  return {
+    id: r.id,
+    date: r.date,
+    title: r.title || '',
+    content: r.content || '',
+    mood: r.mood || '',
+    weather: r.weather || '',
+    tags: r.tags || [],
+    images: r.images || [],
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+/* ---------------- 데이터 계층 (Supabase + localStorage 하이브리드) ---------------- */
 const DB = (() => {
-  const K_ENTRIES = 'diary_entries_v1';
   const K_DRAFT = 'diary_draft_v1';
   const K_THEME = 'diary_theme_v1';
+  const K_SEEDED = 'diary_seeded_v1';
 
-  function getEntries(){
-    try{
-      const raw = localStorage.getItem(K_ENTRIES);
-      return raw ? JSON.parse(raw) : null;
-    }catch(e){ return null; }
+  async function ensureAuth(){
+    const { data: { session } } = await sbClient.auth.getSession();
+    if(session && session.user) return session.user;
+    const { data, error } = await sbClient.auth.signInAnonymously();
+    if(error) throw error;
+    return data.user;
   }
-  function saveEntries(list){
-    localStorage.setItem(K_ENTRIES, JSON.stringify(list));
+
+  async function fetchEntries(userId){
+    const { data, error } = await sbClient
+      .from(ENTRIES_TABLE)
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending:false });
+    if(error) throw error;
+    return (data||[]).map(rowToEntry);
   }
+
+  async function insertEntry(entry, userId){
+    const row = entryToRow(entry, userId);
+    const { data, error } = await sbClient.from(ENTRIES_TABLE).insert(row).select().single();
+    if(error) throw error;
+    return rowToEntry(data);
+  }
+
+  async function updateEntry(entry, userId){
+    const row = entryToRow(entry, userId);
+    delete row.id;
+    const { data, error } = await sbClient.from(ENTRIES_TABLE).update(row).eq('id', entry.id).select().single();
+    if(error) throw error;
+    return rowToEntry(data);
+  }
+
+  async function deleteEntry(id){
+    const { error } = await sbClient.from(ENTRIES_TABLE).delete().eq('id', id);
+    if(error) throw error;
+  }
+
+  function hasSeeded(){ return !!localStorage.getItem(K_SEEDED); }
+  function markSeeded(){ localStorage.setItem(K_SEEDED, '1'); }
+
   function getDraft(){
     try{
       const raw = localStorage.getItem(K_DRAFT);
@@ -309,7 +387,11 @@ const DB = (() => {
   function getTheme(){ return localStorage.getItem(K_THEME) || 'light'; }
   function setTheme(t){ localStorage.setItem(K_THEME, t); }
 
-  return { getEntries, saveEntries, getDraft, saveDraft, clearDraft, getTheme, setTheme };
+  return {
+    ensureAuth, fetchEntries, insertEntry, updateEntry, deleteEntry,
+    hasSeeded, markSeeded,
+    getDraft, saveDraft, clearDraft, getTheme, setTheme,
+  };
 })();
 
 /* ---------------- 상수 ---------------- */
@@ -435,7 +517,6 @@ const QUOTES = [
 
 function moodOf(key){ return MOODS.find(m => m.key === key); }
 function weatherOf(key){ return WEATHERS.find(w => w.key === key); }
-function uid(){ return 'e_' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function pad2(n){ return String(n).padStart(2,'0'); }
 function toDateStr(d){ return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
 function todayStr(){ return toDateStr(new Date()); }
@@ -476,52 +557,56 @@ function highlightText(str, term){
   }catch(e){ return esc; }
 }
 
-/* ---------------- 샘플 데이터 ---------------- */
-function seedIfEmpty(){
-  const existing = DB.getEntries();
-  if(existing && existing.length){ return existing; }
+/* ---------------- 샘플 데이터 (최초 로그인 시 1회 Supabase에 삽입) ---------------- */
+async function seedSampleData(userId){
   const now = new Date();
   const d = (offset) => { const dt = new Date(now); dt.setDate(dt.getDate() - offset); return toDateStr(dt); };
   const sample = [
     {
-      id: uid(), date: d(0), title:'A small walk today',
+      id: newId(), date: d(0), title:'A small walk today',
       content:"I took the long way home after work. The breeze was cool and I felt good the whole walk. Nothing special happened, but there's something calming about an ordinary day like this. I hope I keep making room for small moments like it.",
       mood:'calm', weather:'cloudy', tags:['walk','daily','evening'], images:[],
       createdAt: now.toISOString(), updatedAt: now.toISOString(),
     },
     {
-      id: uid(), date: d(2), title:'Seeing an old friend',
+      id: newId(), date: d(2), title:'Seeing an old friend',
       content:"Met a friend I hadn't seen in months. I was worried it might feel awkward, but the moment we saw each other it was easy again, just like before. A good reminder of how much time with the people I love actually means. We promised not to wait so long next time.",
       mood:'excited', weather:'sunny', tags:['friends','plans','cafe'], images:[],
       createdAt: new Date(now-2*864e5).toISOString(), updatedAt: new Date(now-2*864e5).toISOString(),
     },
     {
-      id: uid(), date: d(5), title:'A tiring day',
+      id: newId(), date: d(5), title:'A tiring day',
       content:"Everything kept piling up and I felt rushed all day. Things didn't go as planned and I was a little disappointed in myself, but I still want to give myself credit for pushing through to the end. Tomorrow I'll try to plan with a bit more breathing room.",
       mood:'down', weather:'rainy', tags:['work','resolve'], images:[],
       createdAt: new Date(now-5*864e5).toISOString(), updatedAt: new Date(now-5*864e5).toISOString(),
     },
     {
-      id: uid(), date: d(9), title:'By the window on a rainy day',
+      id: newId(), date: d(9), title:'By the window on a rainy day',
       content:"Listened to the rain outside with some music on and a good book in hand. Nothing special happened, but it was a quietly good day. I'm learning that on days like this, doing nothing at all can be more than enough.",
       mood:'calm', weather:'rainy', tags:['reading','music','rest'], images:[],
       createdAt: new Date(now-9*864e5).toISOString(), updatedAt: new Date(now-9*864e5).toISOString(),
     },
     {
-      id: uid(), date: d(13), title:'A small win',
+      id: newId(), date: d(13), title:'A small win',
       content:"Finally finished something I'd been putting off! It wasn't a big deal, but just getting it done put me in a great mood. Trying to remember to celebrate small wins as much as the big ones.",
       mood:'happy', weather:'sunny', tags:['win','resolve'], images:[],
       createdAt: new Date(now-13*864e5).toISOString(), updatedAt: new Date(now-13*864e5).toISOString(),
     },
   ];
-  DB.saveEntries(sample);
-  return sample;
+  const inserted = [];
+  for(const e of sample){
+    try{ inserted.push(await DB.insertEntry(e, userId)); }catch(err){ console.error('seed insert failed', err); }
+  }
+  return inserted;
 }
 
 /* ---------------- 전역 상태 ---------------- */
 const state = {
   view: 'home',
-  entries: seedIfEmpty(),
+  entries: [],
+  userId: null,
+  booting: true,
+  bootError: null,
   entryId: null,
   isEditing: false,
   draft: null,
@@ -535,15 +620,13 @@ const state = {
   calendarSelectedDate: null,
   quickMood: null,
   theme: DB.getTheme(),
-  autosaveTimer: null,
+  saving: false,
 };
 
 if(state.theme === 'dark'){ document.documentElement.classList.add('dark'); }
 else { document.documentElement.classList.remove('dark'); }
 
-/* ---------------- 유틸: 저장 / 토스트 / 모달 ---------------- */
-function persistEntries(){ DB.saveEntries(state.entries); }
-
+/* ---------------- 유틸: 토스트 / 모달 ---------------- */
 let toastTimer;
 function showToast(msg){
   const el = document.getElementById('toast');
@@ -669,8 +752,53 @@ function toggleTheme(){
   renderApp();
 }
 
+/* ---------------- 부팅 화면 (인증 + 최초 데이터 로딩) ---------------- */
+function renderBoot(){
+  const app = document.getElementById('app');
+  if(state.bootError){
+    app.innerHTML = `
+      <div class="flex flex-col items-center justify-center text-center px-6" style="min-height:100vh; color:var(--text);">
+        <p class="text-3xl mb-3">⚠️</p>
+        <p class="font-hand text-xl mb-2">연결에 실패했어요</p>
+        <p class="text-sm mb-6" style="color:var(--text-muted); max-width:360px;">${escapeHtml(state.bootError)}</p>
+        <button id="boot-retry" class="btn-primary">다시 시도</button>
+      </div>`;
+    document.getElementById('boot-retry').addEventListener('click', boot);
+    return;
+  }
+  app.innerHTML = `
+    <div class="flex flex-col items-center justify-center gap-3" style="min-height:100vh; color:var(--text);">
+      <p class="text-3xl">🌿</p>
+      <p class="font-hand text-lg" style="color:var(--text-muted)">기록을 불러오는 중…</p>
+    </div>`;
+}
+
+async function boot(){
+  state.booting = true;
+  state.bootError = null;
+  renderBoot();
+  try{
+    const user = await DB.ensureAuth();
+    state.userId = user.id;
+    let entries = await DB.fetchEntries(user.id);
+    if(entries.length === 0 && !DB.hasSeeded()){
+      entries = await seedSampleData(user.id);
+      DB.markSeeded();
+    }
+    state.entries = entries;
+    state.booting = false;
+    renderApp();
+  }catch(err){
+    console.error(err);
+    state.booting = false;
+    state.bootError = (err && err.message) ? err.message : '알 수 없는 오류가 발생했어요.';
+    renderBoot();
+  }
+}
+
 /* ---------------- 라우터 ---------------- */
 function renderApp(){
+  if(state.booting || state.bootError){ renderBoot(); return; }
   if(state.view === 'home') return renderHome();
   if(state.view === 'write') return renderWrite();
   if(state.view === 'list') return renderList();
@@ -805,7 +933,7 @@ function beginWrite(entryId){
   const savedDraft = DB.getDraft();
   const startFresh = () => {
     state.draft = {
-      id: uid(), date: todayStr(), title:'', content:'',
+      id: newId(), date: todayStr(), title:'', content:'',
       mood: state.quickMood || '', weather:'', tags:[], images:[],
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
@@ -948,8 +1076,6 @@ function wireWritePage(){
     if(!t) return;
     if(d.tags.includes(t)){ tagInput.value=''; return; }
     d.tags.push(t);
-    const span = document.createElement('span');
-    span.outerHTML = tagChipHtml(t);
     tagList.insertAdjacentHTML('beforeend', tagChipHtml(t));
     tagInput.value = '';
     wireTagRemovers();
@@ -1014,20 +1140,40 @@ function wireWritePage(){
     });
   });
 
-  document.getElementById('w-save').addEventListener('click', saveEntry);
+  const saveBtn = document.getElementById('w-save');
+  saveBtn.addEventListener('click', saveEntry);
 
-  function saveEntry(){
+  async function saveEntry(){
     if(!d.title.trim() && !d.content.trim()){
       showToast('내용을 입력해주세요 ✏️');
       return;
     }
+    if(state.saving) return;
+    state.saving = true;
+    saveBtn.disabled = true;
+    saveBtn.textContent = '저장 중…';
     d.updatedAt = new Date().toISOString();
-    const idx = state.entries.findIndex(e => e.id === d.id);
-    if(idx >= 0){ state.entries[idx] = d; } else { state.entries.push(d); }
-    persistEntries();
-    DB.clearDraft();
-    showToast('일기를 저장했어요 🌿');
-    nav('detail', { entryId: d.id });
+    try{
+      let saved;
+      const idx = state.entries.findIndex(e => e.id === d.id);
+      if(idx >= 0){
+        saved = await DB.updateEntry(d, state.userId);
+        state.entries[idx] = saved;
+      } else {
+        saved = await DB.insertEntry(d, state.userId);
+        state.entries.push(saved);
+      }
+      DB.clearDraft();
+      state.saving = false;
+      showToast('일기를 저장했어요 🌿');
+      nav('detail', { entryId: saved.id });
+    }catch(err){
+      console.error(err);
+      state.saving = false;
+      saveBtn.disabled = false;
+      saveBtn.textContent = '일기 저장';
+      showToast('저장에 실패했어요: ' + (err && err.message ? err.message : '알 수 없는 오류'));
+    }
   }
 
   function keyHandler(e){
@@ -1112,7 +1258,6 @@ function getFilteredEntries(){
 function renderListResults(){
   const container = document.getElementById('entries-results');
   const list = getFilteredEntries();
-  const isSearching = state.listSearchTitle.trim() || state.listSearchContent.trim() || state.listMoodFilter || state.listTagFilter;
 
   if(!list.length){
     container.innerHTML = state.entries.length === 0 ? `
@@ -1260,11 +1405,16 @@ function renderDetail(){
       body:'삭제한 일기는 다시 되돌릴 수 없어요.',
       confirmLabel:'삭제하기',
       danger:true,
-      onConfirm: () => {
-        state.entries = state.entries.filter(x => x.id !== e.id);
-        persistEntries();
-        showToast('일기를 삭제했어요');
-        nav('list');
+      onConfirm: async () => {
+        try{
+          await DB.deleteEntry(e.id);
+          state.entries = state.entries.filter(x => x.id !== e.id);
+          showToast('일기를 삭제했어요');
+          nav('list');
+        }catch(err){
+          console.error(err);
+          showToast('삭제에 실패했어요: ' + (err && err.message ? err.message : '알 수 없는 오류'));
+        }
       }
     });
   });
@@ -1372,7 +1522,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ---------------- 초기 실행 ---------------- */
-renderApp();
+boot();
 </script>
 </body>
 </html>
