@@ -62,9 +62,6 @@ background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/s
   transition:background-color .35s ease, color .35s ease;
 }
 
-.dark body{
-  background-image:none;
-}
 .font-hand{ font-family:'Black Han Sans', 'Noto Sans KR', sans-serif; letter-spacing:-.01em; }
 .font-brand{ font-family:'Black Han Sans', 'Pretendard', sans-serif; font-weight:400; letter-spacing:-.025em; -webkit-text-stroke:.8px currentColor; text-shadow:0 0 .35px currentColor; }
 ::selection{ background:var(--brand-mint); color:#0F2822; }
@@ -131,7 +128,7 @@ input:focus, textarea:focus, select:focus, button:focus-visible{
 }
 
 .btn-primary{
-  background:#e8bfa0;
+  background:#f8b9cf;
   color:#ffffff;
   border-radius:14px;
   padding:.75rem 1.5rem;
@@ -190,6 +187,9 @@ input:focus, textarea:focus, select:focus, button:focus-visible{
 .mood-pick span.emoji{ font-size:1.5rem; }
 .mood-pick span.label{ font-size:.72rem; color:var(--text-muted); }
 .mood-pick.selected{ border-color: var(--text); background:var(--surface); transform:translateY(-2px); box-shadow:var(--shadow-sm); }
+
+#quick-mood-row .mood-pick{ background:#f7edf1; }
+#quick-mood-row .mood-pick.selected{ background:#f7edf1; }
 
 .weather-pick{
   display:flex; align-items:center; gap:.4rem;
@@ -902,7 +902,7 @@ function renderHome(){
 
   const html = `
     <section class="fade-in mb-10">
-      <p class="text-3sm font-bold mb-1" style="color:#000000">${formatDateKR(today)}</p>
+      <p class="text-3sm font-bold mb-1" style="color:var(--text)">${formatDateKR(today)}</p>
       <h1 class="font-semibold text-4xl sm:text-5xl mb-3" style="color:#757370">어떤 하루, 어떤 생각</h1>
       <div style="overflow:hidden; min-height:1.6em;" class="mb-6">
         <p id="home-quote" class="text-2sm" style="color:#ffffff;-webkit-text-stroke:0.5px #000000; transition:opacity .4s ease, transform .4s ease;">"${QUOTES[state.quoteIndex]}"</p>
@@ -911,7 +911,7 @@ function renderHome(){
       ${todayEntry ? `
         <button id="go-today-entry" class="link-cta">오늘을 되짚어보기 →</button>
       ` : `
-        <div class="paper-card p-5 mb-4" style="background:var(--bg-soft); border-style:dashed;">
+        <div class="paper-card p-5 mb-4" style="background:#f7edf1; border-style:dashed;">
           <p class="text-sm mb-3" style="color:var(--text-muted)">📝 무형의 생각을 유형의 기록으로 남겨주세요</p>
           <button id="go-write-today" class="btn-primary">Write Today's Entry</button>
         </div>
@@ -1062,7 +1062,7 @@ function entryCardHtml(e){
         </div>
         <span class="text-sm">${w?w.emoji:''}</span>
       </div>
-      ${e.images && e.images.length ? `<div class="mt-3 flex gap-1">${e.images.slice(0,3).map(img=>`<img src="${img}" class="w-10 h-10 rounded-lg object-cover" style="border:1px solid var(--border-soft);"/>`).join('')}</div>`:''}
+      ${e.images && e.images.length ? `<div class="mt-3 flex gap-2">${e.images.slice(0,3).map(img=>`<img src="${img}" class="w-24 h-24 rounded-lg object-cover" style="border:1px solid var(--border-soft);"/>`).join('')}</div>`:''}
     </div>
   `;
 }
