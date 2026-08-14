@@ -334,6 +334,8 @@ const DB = (() => {
   const K_DRAFT = 'diary_draft_v1';
   const K_THEME = 'diary_theme_v1';
   const K_SEEDED = 'diary_seeded_v1';
+  const K_FORTUNE = 'diary_fortune_input_v1';
+  
 
   async function ensureAuth(){
     const { data: { session } } = await sbClient.auth.getSession();
@@ -387,10 +389,21 @@ const DB = (() => {
   function getTheme(){ return localStorage.getItem(K_THEME) || 'light'; }
   function setTheme(t){ localStorage.setItem(K_THEME, t); }
 
+  function getFortuneInput(){
+    try{
+      const raw = localStorage.getItem(K_FORTUNE);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+  function saveFortuneInput(f){
+    localStorage.setItem(K_FORTUNE, JSON.stringify({ gender:f.gender, birthDate:f.birthDate, birthTime:f.birthTime }));
+  }
+
   return {
     ensureAuth, fetchEntries, insertEntry, updateEntry, deleteEntry,
     hasSeeded, markSeeded,
     getDraft, saveDraft, clearDraft, getTheme, setTheme,
+    getFortuneInput, saveFortuneInput,
   };
 })();
 
@@ -514,6 +527,99 @@ const QUOTES = [
   '나를 향한 믿음을 잃지 않기로 했다.',
   '오늘도 나답게, 내일도 나답게 살아가자.',
 ];
+
+/* 오늘의 운세용 오리지널 문구 풀 (점수 구간별, 특정 저작물 인용 아님) */
+const FORTUNE_LINES = {
+  great: [
+    '오늘은 하는 일마다 술술 풀리는 날이에요.',
+    '작은 용기를 내면 예상보다 큰 행운이 따라와요.',
+    '주변 사람과의 인연이 좋은 소식을 가져다줄 수 있어요.',
+    '평소보다 자신감 있게 움직여도 좋은 하루예요.',
+    '미뤄뒀던 일을 시작하기에 딱 좋은 타이밍이에요.',
+    '기분 좋은 우연이 하루 중 한 번은 찾아올 거예요.',
+    '마음먹은 대로 흘러가는 흐름이 느껴지는 날이에요.',
+    '누군가에게 받는 작은 칭찬이 큰 힘이 될 수 있어요.',
+  ],
+  good: [
+    '차분하게 준비한 일들이 무난하게 마무리돼요.',
+    '평온한 흐름 속에서 작은 성취를 느낄 수 있어요.',
+    '가까운 사람과의 대화가 마음을 편하게 해줘요.',
+    '무리하지 않으면 기분 좋게 하루를 마칠 수 있어요.',
+    '오늘의 선택들이 대체로 좋은 방향으로 이어져요.',
+    '소소한 여유를 즐기기에 알맞은 하루예요.',
+    '계획한 만큼만 해내도 충분히 만족스러운 날이에요.',
+    '작은 변화가 기분 전환에 도움이 될 수 있어요.',
+  ],
+  normal: [
+    '평범하지만 나쁘지 않은 흐름의 하루예요.',
+    '큰 기복 없이 안정적으로 흘러갈 거예요.',
+    '무리한 결정보다는 신중한 판단이 필요해요.',
+    '평소 하던 대로만 해도 무난하게 지나가는 날이에요.',
+    '작은 실수는 있어도 크게 문제되지 않아요.',
+    '기대와 현실이 비슷하게 맞아떨어지는 하루예요.',
+    '컨디션 관리를 조금 더 신경 쓰면 좋아요.',
+    '차분히 하루를 정리하며 보내는 것도 좋겠어요.',
+  ],
+  tough: [
+    '평소보다 조금 신중하게 움직이는 게 좋은 날이에요.',
+    '중요한 결정은 잠시 미뤄두는 편이 나을 수 있어요.',
+    '사소한 오해가 생기지 않도록 말을 아끼는 게 좋아요.',
+    '컨디션이 흔들릴 수 있으니 무리하지 않길 바라요.',
+    '급한 마음보다는 여유를 갖는 게 도움이 돼요.',
+    '작은 일에도 꼼꼼히 확인하는 습관이 필요한 날이에요.',
+    '예상치 못한 변수에 유연하게 대처해보세요.',
+    '오늘은 남 탓보다 나를 다독이는 게 먼저예요.',
+  ],
+  hard: [
+    '오늘은 평소보다 한 박자 쉬어가는 게 좋아요.',
+    '무리한 도전보다는 익숙한 방식이 안전해요.',
+    '컨디션이 좋지 않다면 충분히 쉬어주세요.',
+    '감정이 앞서기 쉬운 날이니 한 템포 늦추는 게 좋아요.',
+    '중요한 약속이나 결정은 다음으로 미뤄도 괜찮아요.',
+    '작은 다툼이 생기지 않도록 주의가 필요해요.',
+    '오늘 힘들었다면 스스로를 탓하지 않아도 돼요.',
+    '내일은 오늘보다 나아질 거라는 걸 기억해주세요.',
+  ],
+};
+
+function simpleHash(str){
+  let hash = 0;
+  for(let i=0;i<str.length;i++){ hash = (hash*31 + str.charCodeAt(i)) >>> 0; }
+  return hash;
+}
+
+function computeFortune(gender, birthDate, birthTime){
+  const key = `${gender}|${birthDate}|${birthTime||''}|${todayStr()}`;
+  const hash = simpleHash(key);
+  const score = hash % 101;
+  const tier = score>=85 ? 'great' : score>=65 ? 'good' : score>=40 ? 'normal' : score>=20 ? 'tough' : 'hard';
+  const pool = FORTUNE_LINES[tier];
+  const idx1 = hash % pool.length;
+  let idx2 = Math.floor(hash/7) % pool.length;
+  if(idx2 === idx1) idx2 = (idx2+1) % pool.length;
+  const lines = [pool[idx1], pool[idx2]];
+  if(hash % 5 === 0){
+    let idx3 = Math.floor(hash/13) % pool.length;
+    while(idx3===idx1 || idx3===idx2) idx3 = (idx3+1) % pool.length;
+    lines.push(pool[idx3]);
+  }
+  return { score, tier, lines };
+}
+
+const FORTUNE_TIER_LABEL = { great:'아주 좋음', good:'좋음', normal:'보통', tough:'주의', hard:'조심' };
+const FORTUNE_TIER_COLOR = { great:'var(--accent-yellow)', good:'var(--accent-blue)', normal:'var(--accent-gray)', tough:'var(--accent-purple)', hard:'var(--accent-red)' };
+
+function fortuneResultHtml(r){
+  return `
+    <div class="fade-in">
+      <div class="flex items-center justify-between mb-2">
+        <span class="font-hand text-2xl" style="color:var(--text)">${r.score}점</span>
+        <span class="text-xs px-3 py-1 rounded-full font-semibold" style="background:${FORTUNE_TIER_COLOR[r.tier]}; color:#233432;">${FORTUNE_TIER_LABEL[r.tier]}</span>
+      </div>
+      <div class="bar-track h-2 mb-4"><div class="bar-fill" style="width:${r.score}%; background:${FORTUNE_TIER_COLOR[r.tier]};"></div></div>
+      <p class="text-sm leading-7" style="color:var(--text);">${r.lines.map(l=>escapeHtml(l)).join('<br/>')}</p>
+    </div>`;
+}
 
 function moodOf(key){ return MOODS.find(m => m.key === key); }
 function weatherOf(key){ return WEATHERS.find(w => w.key === key); }
@@ -839,6 +945,42 @@ function renderHome(){
       </div>
       <p class="text-xs" style="color:var(--text-muted)">Pick one and it'll pre-fill your mood when you start writing.</p>
     </section>
+  
+    <div class="stitch mb-8"></div>
+      <!-- 오늘의 운세 카드 -->
+      <div class="paper-card p-5 mb-6" style="background:var(--surface);">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-hand text-xl flex items-center gap-2" style="color:var(--text)">
+            <span>🔮</span> 오늘의 운세
+          </h2>
+          ${fortuneInput && !state.editingFortune ? `
+            <button id="re-edit-fortune" class="text-xs px-2.5 py-1 rounded-full btn-ghost">정보 수정</button>
+          ` : ''}
+        </div>
+
+        ${(!fortuneInput || state.editingFortune) ? `
+          <form id="fortune-form" class="space-y-3">
+            <p class="text-xs" style="color:var(--text-muted)">성별과 생년월일을 입력하면 오늘의 운세를 확인할 수 있어요.</p>
+            <div class="grid grid-cols-2 gap-2">
+              <select id="f-gender" class="text-sm p-2 rounded-xl border" style="background:var(--bg-soft); border-color:var(--border); color:var(--text);" required>
+                <option value="">성별 선택</option>
+                <option value="female" ${fortuneInput && fortuneInput.gender==='female'?'selected':''}>여성</option>
+                <option value="male" ${fortuneInput && fortuneInput.gender==='male'?'selected':''}>남성</option>
+              </select>
+              <input type="date" id="f-birthdate" value="${fortuneInput ? fortuneInput.birthDate : ''}" class="text-sm p-2 rounded-xl border" style="background:var(--bg-soft); border-color:var(--border); color:var(--text);" required />
+            </div>
+            <div>
+              <input type="time" id="f-birthtime" value="${fortuneInput ? fortuneInput.birthTime||'' : ''}" placeholder="출생 시간 (선택)" class="w-full text-sm p-2 rounded-xl border" style="background:var(--bg-soft); border-color:var(--border); color:var(--text);" />
+            </div>
+            <div class="flex gap-2 justify-end">
+              ${state.editingFortune ? `<button type="button" id="cancel-fortune" class="btn-ghost text-xs">취소</button>` : ''}
+              <button type="submit" class="btn-primary text-xs !py-2 !px-4">운세 확인하기</button>
+            </div>
+          </form>
+        ` : `
+          ${fortuneResultHtml(fortuneCalc)}
+        `}
+      </div>
 
     <div class="stitch mb-8"></div>
 
