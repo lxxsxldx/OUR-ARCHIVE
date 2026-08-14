@@ -926,6 +926,22 @@ function renderHome(){
       <!-- 상단 스티치 구분선 -->
       <div class="stitch my-8"></div>
 
+    <section class="fade-in">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-hand text-2xl" style="color:var(--text)">최근 기록</h2>
+        <button data-nav="list" class="text-sm" style="color:var(--text-muted)">View all →</button>
+      </div>
+      ${recent.length ? `
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          ${recent.map(e => entryCardHtml(e)).join('')}
+        </div>
+      ` : `<p class="text-sm" style="color:var(--text-muted)">No entries yet. Write your first day.</p>`}
+    </section>
+    
+      <!-- 하단 스티치 구분선 -->
+      <div class="stitch my-8"></div>
+    </section>
+
       <!-- 오늘의 운세 카드 -->
       <div class="paper-card p-5 my-6" style="background:var(--surface);">
         <div class="flex items-center justify-between mb-3">
@@ -961,21 +977,6 @@ function renderHome(){
         `}
       </div>
 
-      <!-- 하단 스티치 구분선 -->
-      <div class="stitch my-8"></div>
-    </section>
-
-    <section class="fade-in">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="font-hand text-2xl" style="color:var(--text)">최근 기록</h2>
-        <button data-nav="list" class="text-sm" style="color:var(--text-muted)">View all →</button>
-      </div>
-      ${recent.length ? `
-        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          ${recent.map(e => entryCardHtml(e)).join('')}
-        </div>
-      ` : `<p class="text-sm" style="color:var(--text-muted)">No entries yet. Write your first day.</p>`}
-    </section>
   `;
   renderShell(html);
 
