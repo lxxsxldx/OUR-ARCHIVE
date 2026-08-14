@@ -1,6 +1,4 @@
 
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -69,7 +67,7 @@ background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/s
 }
 .font-hand{ font-family:'Gugi', 'Noto Sans KR', sans-serif; letter-spacing:-.01em; }
 .font-brand{ font-family:'Black Han Sans', 'Pretendard', sans-serif; font-weight:400; letter-spacing:-.025em; -webkit-text-stroke:.8px currentColor; text-shadow:0 0 .35px currentColor; }
-::selection{ background:var(--brand-); color:#0F2822; }
+::selection{ background:var(--brand-mint); color:#0F2822; }
 button{ font-family:inherit; cursor:pointer; }
 input,textarea,select{ font-family:inherit; }
 input:focus, textarea:focus, select:focus, button:focus-visible{
@@ -424,7 +422,7 @@ const WEATHERS = [
   { key:'snowy',  emoji:'❄️', label:'눈' },
   { key:'windy',  emoji:'🌬️', label:'바람' },
 ];
-/* 감성 다이어리 무드의 오리지널 문장 100개 — 특정 책이나 저작물에서 인용한 것이 아님 */
+
 const QUOTES = [
   '오늘 하루도 잘 버텨낸 나에게 작은 박수를 보낸다.',
   '완벽하지 않아도 괜찮아, 오늘의 최선이면 충분해.',
@@ -528,7 +526,7 @@ const QUOTES = [
   '오늘도 나답게, 내일도 나답게 살아가자.',
 ];
 
-/* 오늘의 운세용 오리지널 문구 풀 (점수 구간별, 특정 저작물 인용 아님) */
+/* 오늘의 운세용 문구 풀 */
 const FORTUNE_LINES = {
   great: [
     '오늘은 하는 일마다 술술 풀리는 날이에요.',
@@ -721,6 +719,7 @@ const state = {
   quickMood: null,
   theme: DB.getTheme(),
   saving: false,
+  editingFortune: false,
 };
 
 if(state.theme === 'dark'){ document.documentElement.classList.add('dark'); }
@@ -792,7 +791,7 @@ function renderShell(innerHtml){
   background:#eee0f4;
   font-family:'SEKUYA', sns-serif;
   font-size:16px;
-  font-weight 300;
+  font-weight:300;
   font-style:normal;
   color:var(--text);
   position:relative;
@@ -800,8 +799,8 @@ function renderShell(innerHtml){
   OA
   <span style="
     position:absolute;
-  left:65%;
-transform:translateX(2px);
+    left:65%;
+    transform:translateX(2px);
     bottom:-1px;
     font-family:'SEKUYA';
     font-size:10px;
@@ -917,6 +916,9 @@ function renderHome(){
   const recent = [...state.entries].sort((a,b)=> (b.date+b.createdAt).localeCompare(a.date+a.createdAt)).slice(0,5);
   if(typeof state.quoteIndex !== 'number') state.quoteIndex = 0;
 
+  const fortuneInput = DB.getFortuneInput();
+  const fortuneCalc = fortuneInput ? computeFortune(fortuneInput.gender, fortuneInput.birthDate, fortuneInput.birthTime) : null;
+
   const html = `
     <section class="fade-in mb-10">
       <p class="text-3sm font-bold mb-1" style="color:#000000">${formatDateKR(today)}</p>
@@ -925,28 +927,6 @@ function renderHome(){
         <p id="home-quote" class="text-2sm" style="color:#ffffff;-webkit-text-stroke:0.5px #000000; transition:opacity .4s ease, transform .4s ease;">"${QUOTES[state.quoteIndex]}"</p>
       </div>
 
-      ${todayEntry ? `
-        <button id="go-today-entry" class="link-cta">오늘을 되짚어보기 →</button>
-      ` : `
-        <div class="paper-card p-5 mb-4" style="background:var(--bg-soft); border-style:dashed;">
-          <p class="text-sm mb-3" style="color:var(--text-muted)">📝 무형의 생각을 유형의 기록으로 남겨주세요</p>
-          <button id="go-write-today" class="btn-primary">Write Today's Entry</button>
-        </div>
-      `}
-
-      <div class="stitch my-8"></div>
-
-      <p class="text-sm font-semibold mb-3" style="color:var(--text)">오늘 기분 어때?</p>
-      <div class="flex flex-wrap gap-3 mb-2" id="quick-mood-row">
-        ${MOODS.map(m => `
-          <button class="mood-pick ${state.quickMood===m.key?'selected':''}" data-quick-mood="${m.key}">
-            <span class="emoji">${m.emoji}</span><span class="label">${m.label}</span>
-          </button>`).join('')}
-      </div>
-      <p class="text-xs" style="color:var(--text-muted)">Pick one and it'll pre-fill your mood when you start writing.</p>
-    </section>
-  
-    <div class="stitch mb-8"></div>
       <!-- 오늘의 운세 카드 -->
       <div class="paper-card p-5 mb-6" style="background:var(--surface);">
         <div class="flex items-center justify-between mb-3">
@@ -982,6 +962,27 @@ function renderHome(){
         `}
       </div>
 
+      ${todayEntry ? `
+        <button id="go-today-entry" class="link-cta">오늘을 되짚어보기 →</button>
+      ` : `
+        <div class="paper-card p-5 mb-4" style="background:var(--bg-soft); border-style:dashed;">
+          <p class="text-sm mb-3" style="color:var(--text-muted)">📝 무형의 생각을 유형의 기록으로 남겨주세요</p>
+          <button id="go-write-today" class="btn-primary">Write Today's Entry</button>
+        </div>
+      `}
+
+      <div class="stitch my-8"></div>
+
+      <p class="text-sm font-semibold mb-3" style="color:var(--text)">오늘 기분 어때?</p>
+      <div class="flex flex-wrap gap-3 mb-2" id="quick-mood-row">
+        ${MOODS.map(m => `
+          <button class="mood-pick ${state.quickMood===m.key?'selected':''}" data-quick-mood="${m.key}">
+            <span class="emoji">${m.emoji}</span><span class="label">${m.label}</span>
+          </button>`).join('')}
+      </div>
+      <p class="text-xs" style="color:var(--text-muted)">Pick one and it'll pre-fill your mood when you start writing.</p>
+    </section>
+
     <div class="stitch mb-8"></div>
 
     <section class="fade-in">
@@ -997,6 +998,32 @@ function renderHome(){
     </section>
   `;
   renderShell(html);
+
+  // 이벤트 바인딩
+  const fortuneForm = document.getElementById('fortune-form');
+  if(fortuneForm){
+    fortuneForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const gender = document.getElementById('f-gender').value;
+      const birthDate = document.getElementById('f-birthdate').value;
+      const birthTime = document.getElementById('f-birthtime').value;
+      if(!gender || !birthDate) return;
+      DB.saveFortuneInput({ gender, birthDate, birthTime });
+      state.editingFortune = false;
+      showToast('오늘의 운세를 확인했어요 🔮');
+      renderHome();
+    });
+  }
+
+  document.getElementById('re-edit-fortune')?.addEventListener('click', () => {
+    state.editingFortune = true;
+    renderHome();
+  });
+
+  document.getElementById('cancel-fortune')?.addEventListener('click', () => {
+    state.editingFortune = false;
+    renderHome();
+  });
 
   document.getElementById('go-today-entry')?.addEventListener('click', () => nav('detail', { entryId: todayEntry.id }));
   document.getElementById('go-write-today')?.addEventListener('click', () => beginWrite());
@@ -1083,7 +1110,6 @@ function beginWrite(entryId){
       confirmLabel:'불러오기',
       onConfirm: () => { state.draft = savedDraft; state.isEditing = false; nav('write'); }
     });
-    // add a lightweight secondary action via toast-style hint
     setTimeout(() => {
       const box = document.querySelector('.modal-box');
       if(box && !box.querySelector('#fresh-btn')){
