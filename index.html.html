@@ -128,7 +128,7 @@ input:focus, textarea:focus, select:focus, button:focus-visible{
 }
 
 .btn-primary{
-  background:#f8b9cf;
+  background:#e8bfa0;
   color:#ffffff;
   border-radius:14px;
   padding:.75rem 1.5rem;
@@ -151,6 +151,13 @@ input:focus, textarea:focus, select:focus, button:focus-visible{
   transition:background .18s ease, border-color .18s ease;
 }
 .btn-ghost:hover{ background:var(--bg-soft); }
+
+button.btn-ghost.btn-ivory{
+  background:#FFFFF0;
+  color:#4A4238;
+  border-color:#FFFFF0;
+}
+button.btn-ghost.btn-ivory:hover{ background:#FFFAE0; }
 
 /* ---- text-style CTA link (no box/border) used for "Write Today's Entry" ---- */
 .link-cta{
@@ -339,12 +346,37 @@ const DB = (() => {
   const K_FORTUNE = 'diary_fortune_input_v1';
   
 
-  async function ensureAuth(){
+  const ID_SUFFIX = '@ourarchive.local';
+  function usernameToEmail(username){
+    const clean = (username||'').trim().toLowerCase().replace(/[^a-z0-9_.-]/g,'');
+    return clean + ID_SUFFIX;
+  }
+
+  async function getSession(){
     const { data: { session } } = await sbClient.auth.getSession();
-    if(session && session.user) return session.user;
-    const { data, error } = await sbClient.auth.signInAnonymously();
+    return session;
+  }
+
+  async function signUp(username, password){
+    const email = usernameToEmail(username);
+    const { data, error } = await sbClient.auth.signUp({
+      email, password,
+      options: { data: { username: (username||'').trim() } }
+    });
+    if(error) throw error;
+    return data.session ? data.user : null;
+  }
+
+  async function signIn(username, password){
+    const email = usernameToEmail(username);
+    const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
     if(error) throw error;
     return data.user;
+  }
+
+  async function signOut(){
+    const { error } = await sbClient.auth.signOut();
+    if(error) throw error;
   }
 
   async function fetchEntries(userId){
@@ -377,8 +409,8 @@ const DB = (() => {
     if(error) throw error;
   }
 
-  function hasSeeded(){ return !!localStorage.getItem(K_SEEDED); }
-  function markSeeded(){ localStorage.setItem(K_SEEDED, '1'); }
+  function hasSeeded(userId){ return !!localStorage.getItem(K_SEEDED + ':' + userId); }
+  function markSeeded(userId){ localStorage.setItem(K_SEEDED + ':' + userId, '1'); }
 
   function getDraft(){
     try{
@@ -402,7 +434,8 @@ const DB = (() => {
   }
 
   return {
-    ensureAuth, fetchEntries, insertEntry, updateEntry, deleteEntry,
+    getSession, signUp, signIn, signOut,
+    fetchEntries, insertEntry, updateEntry, deleteEntry,
     hasSeeded, markSeeded,
     getDraft, saveDraft, clearDraft, getTheme, setTheme,
     getFortuneInput, saveFortuneInput,
@@ -701,6 +734,9 @@ const state = {
   theme: DB.getTheme(),
   saving: false,
   editingFortune: false,
+  username: '',
+  authMode: 'login',
+  authError: null,
 };
 
 if(state.theme === 'dark'){ document.documentElement.classList.add('dark'); }
@@ -803,7 +839,11 @@ function renderShell(innerHtml){
         <nav class="desktop-nav flex items-center gap-7">
           ${NAV_ITEMS.map(it => `<button data-nav="${it.key}" class="nav-link ${state.view===it.key?'active':''}">${it.label}</button>`).join('')}
         </nav>
-        <button id="theme-toggle" class="btn-ghost !px-3 !py-2 text-sm" title="Toggle dark mode (shortcut: D)">${state.theme==='dark'?'☀️':'🌙'}</button>
+        <div class="flex items-center gap-2">
+          ${state.username ? `<span class="text-xs hidden sm:inline" style="color:var(--text-muted)">@${escapeHtml(state.username)}</span>` : ''}
+          <button id="theme-toggle" class="btn-ghost btn-ivory !px-3 !py-2 text-sm" title="Toggle dark mode (shortcut: D)">${state.theme==='dark'?'☀️':'🌙'}</button>
+          <button id="logout-btn" class="btn-ghost btn-ivory !px-3 !py-2 text-sm" title="로그아웃">🚪</button>
+        </div>
       </div>
     </header>
     <main class="max-w-5xl mx-auto px-5 pt-6">${innerHtml}</main>
@@ -823,6 +863,28 @@ function renderShell(innerHtml){
     });
   });
   document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    showModal({
+      title:'로그아웃 할까요?',
+      body:'다시 로그인하면 저장된 기록을 이어서 볼 수 있어요.',
+      confirmLabel:'로그아웃',
+      danger:true,
+      onConfirm: async () => {
+        try{
+          await DB.signOut();
+          state.entries = [];
+          state.userId = null;
+          state.username = '';
+          state.authMode = 'login';
+          state.authError = null;
+          nav('auth');
+        }catch(err){
+          console.error(err);
+          showToast('로그아웃에 실패했어요');
+        }
+      }
+    });
+  });
 }
 
 function toggleTheme(){
@@ -858,16 +920,14 @@ async function boot(){
   state.bootError = null;
   renderBoot();
   try{
-    const user = await DB.ensureAuth();
-    state.userId = user.id;
-    let entries = await DB.fetchEntries(user.id);
-    if(entries.length === 0 && !DB.hasSeeded()){
-      entries = await seedSampleData(user.id);
-      DB.markSeeded();
+    const session = await DB.getSession();
+    if(session && session.user){
+      await afterAuth(session.user);
+    } else {
+      state.booting = false;
+      state.view = 'auth';
+      renderApp();
     }
-    state.entries = entries;
-    state.booting = false;
-    renderApp();
   }catch(err){
     console.error(err);
     state.booting = false;
@@ -876,9 +936,97 @@ async function boot(){
   }
 }
 
+async function afterAuth(user){
+  state.userId = user.id;
+  state.username = (user.user_metadata && user.user_metadata.username) || '';
+  let entries = await DB.fetchEntries(user.id);
+  if(entries.length === 0 && !DB.hasSeeded(user.id)){
+    entries = await seedSampleData(user.id);
+    DB.markSeeded(user.id);
+  }
+  state.entries = entries;
+  state.booting = false;
+  state.view = 'home';
+  renderApp();
+}
+
+function translateAuthError(err){
+  const msg = (err && err.message) || '';
+  if(/already registered|already exists|user already/i.test(msg)) return '이미 사용 중인 아이디예요.';
+  if(/invalid login credentials/i.test(msg)) return '아이디 또는 비밀번호가 올바르지 않아요.';
+  if(/at least|should be at least|password.*character/i.test(msg)) return '비밀번호는 6자 이상이어야 해요.';
+  if(/confirm/i.test(msg)) return '계정 인증이 필요해요. 잠시 후 다시 시도해주세요.';
+  return msg || '알 수 없는 오류가 발생했어요.';
+}
+
+/* ---------------- 로그인 / 회원가입 화면 ---------------- */
+function renderAuth(){
+  const app = document.getElementById('app');
+  const mode = state.authMode || 'login';
+  app.innerHTML = `
+    <div class="flex flex-col items-center justify-center px-6" style="min-height:100vh;">
+      <div class="paper-card p-8 w-full" style="max-width:380px;">
+        <div class="text-center mb-6">
+          <p class="font-hand text-3xl mb-1" style="color:var(--text)">Our Archive</p>
+          <p class="text-sm" style="color:var(--text-muted)">${mode==='login' ? '아이디와 비밀번호로 로그인해주세요' : '아이디와 비밀번호를 만들어주세요'}</p>
+        </div>
+        <form id="auth-form" class="space-y-3">
+          <div>
+            <input id="auth-id" type="text" placeholder="아이디" autocomplete="username"
+              class="w-full px-4 py-3 text-sm rounded-xl" style="background:var(--bg-soft); border:1px solid var(--border-soft); color:var(--text);" required />
+            ${mode==='signup' ? `<p class="text-xs mt-1.5" style="color:var(--text-muted)">영문 소문자, 숫자, ., _, - 만 사용할 수 있어요.</p>` : ''}
+          </div>
+          <div>
+            <input id="auth-pw" type="password" placeholder="비밀번호 (6자 이상)" autocomplete="${mode==='login'?'current-password':'new-password'}"
+              class="w-full px-4 py-3 text-sm rounded-xl" style="background:var(--bg-soft); border:1px solid var(--border-soft); color:var(--text);" required minlength="6" />
+            ${mode==='signup' ? `<p class="text-xs mt-1.5" style="color:var(--text-muted)">6자 이상으로 입력해주세요.</p>` : ''}
+          </div>
+          ${state.authError ? `<p class="text-xs" style="color:var(--accent-red)">${escapeHtml(state.authError)}</p>` : ''}
+          <button id="auth-submit" type="submit" class="btn-primary w-full !py-3">${mode==='login' ? '로그인' : '회원가입'}</button>
+        </form>
+        <p class="text-center text-sm mt-5" style="color:var(--text-muted)">
+          ${mode==='login' ? '아직 계정이 없나요?' : '이미 계정이 있나요?'}
+          <button id="auth-toggle" class="font-semibold" style="color:var(--text);">${mode==='login' ? '회원가입' : '로그인'}</button>
+        </p>
+      </div>
+    </div>`;
+
+  document.getElementById('auth-toggle').addEventListener('click', () => {
+    state.authMode = mode === 'login' ? 'signup' : 'login';
+    state.authError = null;
+    renderAuth();
+  });
+
+  document.getElementById('auth-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('auth-id').value.trim();
+    const pw = document.getElementById('auth-pw').value;
+    if(!id || !pw) return;
+    const btn = document.getElementById('auth-submit');
+    btn.disabled = true;
+    btn.textContent = '처리 중…';
+    state.authError = null;
+    try{
+      let user;
+      if(mode === 'login'){
+        user = await DB.signIn(id, pw);
+      } else {
+        user = await DB.signUp(id, pw);
+        if(!user){ user = await DB.signIn(id, pw); }
+      }
+      await afterAuth(user);
+    }catch(err){
+      console.error(err);
+      state.authError = translateAuthError(err);
+      renderAuth();
+    }
+  });
+}
+
 /* ---------------- 라우터 ---------------- */
 function renderApp(){
   if(state.booting || state.bootError){ renderBoot(); return; }
+  if(state.view === 'auth') return renderAuth();
   if(state.view === 'home') return renderHome();
   if(state.view === 'write') return renderWrite();
   if(state.view === 'list') return renderList();
