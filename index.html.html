@@ -562,13 +562,6 @@ async function seedSampleData(userId){
   const now = new Date();
   const d = (offset) => { const dt = new Date(now); dt.setDate(dt.getDate() - offset); return toDateStr(dt); };
   const sample = [
-      {
-      id: newId(), date: d(0), title:'A small walk today',
-      id: newId(), date: d(1), title:'A small walk today',
-      content:"I took the long way home after work. The breeze was cool and I felt good the whole walk. Nothing special happened, but there's something calming about an ordinary day like this. I hope I keep making room for small moments like it.",
-      mood:'calm', weather:'cloudy', tags:['walk','daily','evening'], images:[],
-      createdAt: now.toISOString(), updatedAt: now.toISOString(),
-    },
     {
       id: newId(), date: d(2), title:'Seeing an old friend',
       content:"Met a friend I hadn't seen in months. I was worried it might feel awkward, but the moment we saw each other it was easy again, just like before. A good reminder of how much time with the people I love actually means. We promised not to wait so long next time.",
