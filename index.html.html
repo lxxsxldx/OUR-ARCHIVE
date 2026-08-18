@@ -906,7 +906,7 @@ function sidePanelsHtml(){
       ${miniCalendarHtml()}
       ${weatherWidgetHtml()}
     </aside>
-    <aside class="side-panel side-panel-right paper-card p-4" style="background:#e9e9e6;">
+    <aside class="side-panel side-panel-right paper-card p-4" style="background:#fcf6e3;">
       <h4 class="font-hand text-lg mb-3" style="color:var(--text)">바로가기</h4>
       <div class="flex flex-col gap-2 mb-4">
         <button type="button" data-side-nav="write" class="btn-ghost text-xs !py-2 text-left">✍️ 오늘 일기 쓰기</button>
@@ -1207,7 +1207,7 @@ function miniCalendarHtml(){
   }
 
   return `
-    <div class="paper-card p-4" style="background:#e9e9e6;">
+    <div class="paper-card p-4" style="background:#fcf6e3;">
       <div class="flex items-center justify-between mb-3">
         <button type="button" id="mini-cal-prev" class="btn-ghost !px-2 !py-1 text-xs">‹</button>
         <h3 class="font-hand text-lg" style="color:var(--text)">${year}. ${month+1}</h3>
@@ -1246,14 +1246,14 @@ function wireMiniCalendar(){
 /* ---------------- 홈 대시보드: 날씨 위젯 ---------------- */
 function weatherWidgetHtml(){
   if(state.weatherLoading && !state.weatherData){
-    return `<div class="paper-card p-4" style="background:#e9e9e6;"><p class="text-sm" style="color:var(--text-muted)">날씨 정보를 불러오는 중…</p></div>`;
+    return `<div class="paper-card p-4" style="background:#fcf6e3;"><p class="text-sm" style="color:var(--text-muted)">날씨 정보를 불러오는 중…</p></div>`;
   }
   if(state.weatherError && !state.weatherData){
-    return `<div class="paper-card p-4" style="background:#e9e9e6;"><p class="text-sm" style="color:var(--text-muted)">${escapeHtml(state.weatherError)}</p></div>`;
+    return `<div class="paper-card p-4" style="background:#fcf6e3;"><p class="text-sm" style="color:var(--text-muted)">${escapeHtml(state.weatherError)}</p></div>`;
   }
   if(!state.weatherData) return '';
   return `
-    <div class="paper-card p-4" style="background:#e9e9e6;">
+    <div class="paper-card p-4" style="background:#fcf6e3;">
       <h3 class="font-hand text-lg mb-3" style="color:var(--text)">오늘의 날씨</h3>
       <div class="grid grid-cols-2 gap-3 mb-4">
         ${state.weatherData.map(c => {
