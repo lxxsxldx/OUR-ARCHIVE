@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -457,18 +458,31 @@ const DB = (() => {
     localStorage.setItem(K_FORTUNE, JSON.stringify({ gender:f.gender, birthDate:f.birthDate, birthTime:f.birthTime }));
   }
 
-  const K_TODOS_PREFIX = 'diary_todos_v1:';
-  function getTodos(userId){
-    try{
-      const raw = localStorage.getItem(K_TODOS_PREFIX + userId);
-      return raw ? JSON.parse(raw) : {};
-    }catch(e){ return {}; }
+  const TODOS_TABLE = 'todos';
+  async function fetchTodos(userId){
+    const { data, error } = await sbClient
+      .from(TODOS_TABLE)
+      .select('date, content')
+      .eq('user_id', userId);
+    if(error) throw error;
+    const map = {};
+    (data||[]).forEach(row => { if(row.content) map[row.date] = row.content; });
+    return map;
   }
-  function saveTodo(userId, date, text){
-    const all = getTodos(userId);
-    if(text && text.trim()){ all[date] = text; } else { delete all[date]; }
-    localStorage.setItem(K_TODOS_PREFIX + userId, JSON.stringify(all));
-    return all;
+  async function saveTodo(userId, date, text){
+    if(text && text.trim()){
+      const { error } = await sbClient
+        .from(TODOS_TABLE)
+        .upsert({ user_id: userId, date, content: text, updated_at: new Date().toISOString() }, { onConflict: 'user_id,date' });
+      if(error) throw error;
+    } else {
+      const { error } = await sbClient
+        .from(TODOS_TABLE)
+        .delete()
+        .eq('user_id', userId)
+        .eq('date', date);
+      if(error) throw error;
+    }
   }
 
   return {
@@ -476,7 +490,7 @@ const DB = (() => {
     fetchEntries, insertEntry, updateEntry, deleteEntry,
     getDraft, saveDraft, clearDraft, getTheme, setTheme,
     getFortuneInput, saveFortuneInput,
-    getTodos, saveTodo,
+    fetchTodos, saveTodo,
   };
 })();
 
@@ -1021,7 +1035,12 @@ async function afterAuth(user){
   state.username = (user.user_metadata && user.user_metadata.username) || '';
   const entries = await DB.fetchEntries(user.id);
   state.entries = entries;
-  state.todos = DB.getTodos(user.id);
+  try{
+    state.todos = await DB.fetchTodos(user.id);
+  }catch(err){
+    console.error('todos fetch failed (todos 테이블이 아직 없을 수 있어요):', err);
+    state.todos = {};
+  }
   state.booting = false;
   state.view = 'home';
   renderApp();
@@ -1249,16 +1268,52 @@ function todoWidgetsHtml(){
         <textarea class="todo-textarea w-full text-sm p-2" rows="4" data-todo-date="${dObj.date}"
           placeholder="할 일을 적어보세요…"
           style="background:var(--bg-soft); border:1px solid var(--border-soft); border-radius:10px; color:var(--text); resize:vertical;">${escapeHtml(text)}</textarea>
+        <div class="flex items-center justify-between mt-2">
+          <span class="text-[10px] todo-save-status" data-todo-status="${dObj.date}" style="color:var(--text-muted);"></span>
+          <button type="button" class="btn-primary text-xs !py-1.5 !px-3" data-todo-save="${dObj.date}">저장</button>
+        </div>
       </div>`;
   }).join('');
 }
 
 function wireTodoWidgets(){
   document.querySelectorAll('.todo-textarea').forEach(ta => {
-    const doSaveTodo = debounce((date, value) => {
-      state.todos = DB.saveTodo(state.userId, date, value);
-    }, 500);
+    const doSaveTodo = debounce(async (date, value) => {
+      if(value && value.trim()){ state.todos[date] = value; } else { delete state.todos[date]; }
+      try{
+        await DB.saveTodo(state.userId, date, value);
+      }catch(err){
+        console.error(err);
+      }
+    }, 800);
     ta.addEventListener('input', (e) => { doSaveTodo(ta.getAttribute('data-todo-date'), e.target.value); });
+  });
+
+  document.querySelectorAll('[data-todo-save]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const date = btn.getAttribute('data-todo-save');
+      const ta = document.querySelector(`.todo-textarea[data-todo-date="${date}"]`);
+      const statusEl = document.querySelector(`[data-todo-status="${date}"]`);
+      if(!ta) return;
+      const value = ta.value;
+      btn.disabled = true;
+      const original = btn.textContent;
+      btn.textContent = '저장 중…';
+      if(statusEl) statusEl.textContent = '';
+      try{
+        await DB.saveTodo(state.userId, date, value);
+        if(value && value.trim()){ state.todos[date] = value; } else { delete state.todos[date]; }
+        showToast('할 일을 저장했어요 📝');
+        if(statusEl) statusEl.textContent = '저장됨 ✓';
+      }catch(err){
+        console.error(err);
+        showToast('할 일 저장에 실패했어요: ' + (err && err.message ? err.message : '알 수 없는 오류'));
+        if(statusEl) statusEl.textContent = '저장 실패';
+      }finally{
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    });
   });
 }
 
