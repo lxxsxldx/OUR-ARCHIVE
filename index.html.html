@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -252,6 +251,19 @@ button.btn-ghost.btn-ivory:hover{ background:#FFFAE0; }
 .cal-cell.has-entry{ box-shadow: inset 0 0 0 2px rgba(255,255,255,.55); }
 .cal-cell.selected{ outline:2px solid var(--text); outline-offset:1px; }
 
+.mini-cal-cell{
+  aspect-ratio:1/1; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:1px; font-size:.72rem; border:1px solid transparent; background:transparent; color:var(--text);
+  transition:all .15s ease; padding:0;
+}
+.mini-cal-cell:hover{ border-color:var(--border); }
+.mini-cal-cell.mini-today{ font-weight:700; color:var(--brand-mint); }
+.mini-cal-cell.mini-selected{ background:#f7edf1; border-color:var(--text); color:#233432; }
+.mini-cal-dots{ display:flex; gap:2px; height:5px; }
+.mini-cal-dots .dot{ width:4px; height:4px; border-radius:999px; display:inline-block; }
+.dot-entry{ background:var(--brand-mint); }
+.dot-todo{ background:var(--accent-pink); }
+
 textarea{ resize:vertical; }
 
 .bar-track{ background:var(--bg-soft); border-radius:999px; overflow:hidden; }
@@ -272,6 +284,22 @@ textarea{ resize:vertical; }
 kbd{
   background:var(--bg-soft); border:1px solid var(--border); border-radius:6px;
   padding:1px 6px; font-size:.75rem; font-family:inherit;
+}
+
+.side-panel{
+  position:fixed;
+  top:90px;
+  width:200px;
+  max-height:calc(100vh - 110px);
+  overflow-y:auto;
+  z-index:30;
+}
+.side-panel-left{ left: calc(50% - 512px - 16px - 200px); display:flex; flex-direction:column; gap:12px; }
+.side-panel-right{ right: calc(50% - 512px - 16px - 200px); }
+.side-panel .chip{ cursor:pointer; border:none; }
+.side-panel .chip:hover{ background:var(--brand-pink); color:#fff; }
+@media (max-width: 1500px){
+  .side-panel{ display:none; }
 }
 
 @media (max-width: 640px){
@@ -429,11 +457,26 @@ const DB = (() => {
     localStorage.setItem(K_FORTUNE, JSON.stringify({ gender:f.gender, birthDate:f.birthDate, birthTime:f.birthTime }));
   }
 
+  const K_TODOS_PREFIX = 'diary_todos_v1:';
+  function getTodos(userId){
+    try{
+      const raw = localStorage.getItem(K_TODOS_PREFIX + userId);
+      return raw ? JSON.parse(raw) : {};
+    }catch(e){ return {}; }
+  }
+  function saveTodo(userId, date, text){
+    const all = getTodos(userId);
+    if(text && text.trim()){ all[date] = text; } else { delete all[date]; }
+    localStorage.setItem(K_TODOS_PREFIX + userId, JSON.stringify(all));
+    return all;
+  }
+
   return {
     getSession, signUp, signIn, signOut,
     fetchEntries, insertEntry, updateEntry, deleteEntry,
     getDraft, saveDraft, clearDraft, getTheme, setTheme,
     getFortuneInput, saveFortuneInput,
+    getTodos, saveTodo,
   };
 })();
 
@@ -670,6 +713,47 @@ function highlightText(str, term){
   }catch(e){ return esc; }
 }
 
+/* ---------------- 날씨 (경주 / 포항, Open-Meteo) ---------------- */
+const WEATHER_CITIES = [
+  { key:'gyeongju', name:'경주', lat:35.8562, lon:129.2247 },
+  { key:'pohang',   name:'포항', lat:36.0190, lon:129.3435 },
+];
+function weatherCodeInfo(code){
+  const map = {
+    0:{emoji:'☀️',label:'맑음'}, 1:{emoji:'🌤️',label:'대체로 맑음'}, 2:{emoji:'⛅',label:'부분 흐림'}, 3:{emoji:'☁️',label:'흐림'},
+    45:{emoji:'🌫️',label:'안개'}, 48:{emoji:'🌫️',label:'서리 안개'},
+    51:{emoji:'🌦️',label:'약한 이슬비'}, 53:{emoji:'🌦️',label:'이슬비'}, 55:{emoji:'🌦️',label:'강한 이슬비'},
+    56:{emoji:'🌧️',label:'어는 이슬비'}, 57:{emoji:'🌧️',label:'어는 이슬비'},
+    61:{emoji:'🌧️',label:'약한 비'}, 63:{emoji:'🌧️',label:'비'}, 65:{emoji:'🌧️',label:'강한 비'},
+    66:{emoji:'🌧️',label:'어는 비'}, 67:{emoji:'🌧️',label:'어는 비'},
+    71:{emoji:'🌨️',label:'약한 눈'}, 73:{emoji:'🌨️',label:'눈'}, 75:{emoji:'❄️',label:'강한 눈'}, 77:{emoji:'🌨️',label:'싸락눈'},
+    80:{emoji:'🌦️',label:'약한 소나기'}, 81:{emoji:'🌦️',label:'소나기'}, 82:{emoji:'⛈️',label:'강한 소나기'},
+    85:{emoji:'🌨️',label:'약한 소낙눈'}, 86:{emoji:'🌨️',label:'소낙눈'},
+    95:{emoji:'⛈️',label:'뇌우'}, 96:{emoji:'⛈️',label:'우박 동반 뇌우'}, 99:{emoji:'⛈️',label:'우박 동반 뇌우'},
+  };
+  return map[code] || { emoji:'🌡️', label:'-' };
+}
+async function fetchWeather(){
+  state.weatherLoading = true;
+  try{
+    const results = await Promise.all(WEATHER_CITIES.map(async c => {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${c.lat}&longitude=${c.lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Asia%2FSeoul&forecast_days=7`;
+      const res = await fetch(url);
+      if(!res.ok) throw new Error('weather fetch failed');
+      const data = await res.json();
+      return { key:c.key, name:c.name, current:data.current, daily:data.daily };
+    }));
+    state.weatherData = results;
+    state.weatherError = null;
+  }catch(err){
+    console.error(err);
+    state.weatherError = '날씨 정보를 불러오지 못했어요.';
+  }finally{
+    state.weatherLoading = false;
+    if(state.view === 'home') renderHome();
+  }
+}
+
 /* ---------------- 전역 상태 ---------------- */
 const state = {
   view: 'home',
@@ -695,6 +779,12 @@ const state = {
   username: '',
   authMode: 'login',
   authError: null,
+  homeCalCursor: new Date(),
+  homeAnchorDate: todayStr(),
+  todos: {},
+  weatherData: null,
+  weatherLoading: false,
+  weatherError: null,
 };
 
 if(state.theme === 'dark'){ document.documentElement.classList.add('dark'); }
@@ -748,6 +838,28 @@ const NAV_ITEMS = [
   { key:'list',  label:'Entries', icon:'📔' },
   { key:'stats', label:'Stats',   icon:'📊' },
 ];
+
+/* ---------------- 고정 사이드 패널 (넓은 화면 여백 활용) ---------------- */
+function sidePanelsHtml(){
+  return `
+    <aside class="side-panel side-panel-left">
+      ${miniCalendarHtml()}
+      ${weatherWidgetHtml()}
+    </aside>
+    <aside class="side-panel side-panel-right paper-card p-4">
+      <h4 class="font-hand text-lg mb-3" style="color:var(--text)">바로가기</h4>
+      <div class="flex flex-col gap-2 mb-4">
+        <button type="button" data-side-nav="write" class="btn-ghost text-xs !py-2 text-left">✍️ 오늘 일기 쓰기</button>
+        <button type="button" data-side-nav="stats" class="btn-ghost text-xs !py-2 text-left">📊 감정 통계 보기</button>
+        <button type="button" data-side-nav="list" class="btn-ghost text-xs !py-2 text-left">📔 캘린더 보기</button>
+      </div>
+      <div class="stitch my-4"></div>
+      <div class="space-y-3">
+        ${todoWidgetsHtml()}
+      </div>
+    </aside>
+  `;
+}
 
 function renderShell(innerHtml){
   const app = document.getElementById('app');
@@ -812,6 +924,7 @@ function renderShell(innerHtml){
           <span style="font-size:.66rem; font-weight:600;">${it.label}</span>
         </button>`).join('')}
     </nav>
+    ${sidePanelsHtml()}
   `;
   app.querySelectorAll('[data-nav]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -820,6 +933,15 @@ function renderShell(innerHtml){
       else { nav(target); }
     });
   });
+  app.querySelectorAll('[data-side-nav]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.getAttribute('data-side-nav');
+      if(target === 'write'){ beginWrite(); }
+      else { nav(target); }
+    });
+  });
+  wireMiniCalendar();
+  wireTodoWidgets();
   document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
   document.getElementById('logout-btn').addEventListener('click', () => {
     showModal({
@@ -899,9 +1021,11 @@ async function afterAuth(user){
   state.username = (user.user_metadata && user.user_metadata.username) || '';
   const entries = await DB.fetchEntries(user.id);
   state.entries = entries;
+  state.todos = DB.getTodos(user.id);
   state.booting = false;
   state.view = 'home';
   renderApp();
+  fetchWeather();
 }
 
 function translateAuthError(err){
@@ -992,6 +1116,152 @@ function renderApp(){
 /* ============================================================
    홈
    ============================================================ */
+/* ---------------- 홈 대시보드: 미니 달력 ---------------- */
+function miniCalendarHtml(){
+  const cursor = state.homeCalCursor;
+  const year = cursor.getFullYear(), month = cursor.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const startWeekday = firstDay.getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const entryDates = {};
+  state.entries.forEach(e => { entryDates[e.date] = true; });
+
+  let cells = '';
+  for(let i=0;i<startWeekday;i++) cells += `<div></div>`;
+  for(let day=1; day<=daysInMonth; day++){
+    const dateStr = `${year}-${pad2(month+1)}-${pad2(day)}`;
+    const isToday = dateStr === todayStr();
+    const isAnchor = dateStr === state.homeAnchorDate;
+    const hasEntry = !!entryDates[dateStr];
+    const hasTodo = !!(state.todos && state.todos[dateStr]);
+    cells += `
+      <button type="button" class="mini-cal-cell ${isToday?'mini-today':''} ${isAnchor?'mini-selected':''}" data-mini-date="${dateStr}">
+        <span>${day}</span>
+        <span class="mini-cal-dots">${hasEntry?'<i class="dot dot-entry"></i>':''}${hasTodo?'<i class="dot dot-todo"></i>':''}</span>
+      </button>`;
+  }
+
+  return `
+    <div class="paper-card p-4">
+      <div class="flex items-center justify-between mb-3">
+        <button type="button" id="mini-cal-prev" class="btn-ghost !px-2 !py-1 text-xs">‹</button>
+        <h3 class="font-hand text-lg" style="color:var(--text)">${year}. ${month+1}</h3>
+        <button type="button" id="mini-cal-next" class="btn-ghost !px-2 !py-1 text-xs">›</button>
+      </div>
+      <div class="grid grid-cols-7 gap-1 mb-1 text-center" style="font-size:.65rem; color:var(--text-muted)">
+        ${['일','월','화','수','목','금','토'].map(d=>`<div>${d}</div>`).join('')}
+      </div>
+      <div class="grid grid-cols-7 gap-1">${cells}</div>
+      <div class="flex gap-3 mt-3 pt-3 text-[10px]" style="border-top:1px solid var(--border-soft); color:var(--text-muted);">
+        <span class="flex items-center gap-1"><i class="dot dot-entry" style="display:inline-block;"></i>일기</span>
+        <span class="flex items-center gap-1"><i class="dot dot-todo" style="display:inline-block;"></i>할 일</span>
+      </div>
+    </div>`;
+}
+
+function wireMiniCalendar(){
+  document.querySelectorAll('[data-mini-date]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.homeAnchorDate = btn.getAttribute('data-mini-date');
+      renderApp();
+    });
+  });
+  document.getElementById('mini-cal-prev')?.addEventListener('click', () => {
+    const c = state.homeCalCursor;
+    state.homeCalCursor = new Date(c.getFullYear(), c.getMonth()-1, 1);
+    renderApp();
+  });
+  document.getElementById('mini-cal-next')?.addEventListener('click', () => {
+    const c = state.homeCalCursor;
+    state.homeCalCursor = new Date(c.getFullYear(), c.getMonth()+1, 1);
+    renderApp();
+  });
+}
+
+/* ---------------- 홈 대시보드: 날씨 위젯 ---------------- */
+function weatherWidgetHtml(){
+  if(state.weatherLoading && !state.weatherData){
+    return `<div class="paper-card p-4"><p class="text-sm" style="color:var(--text-muted)">날씨 정보를 불러오는 중…</p></div>`;
+  }
+  if(state.weatherError && !state.weatherData){
+    return `<div class="paper-card p-4"><p class="text-sm" style="color:var(--text-muted)">${escapeHtml(state.weatherError)}</p></div>`;
+  }
+  if(!state.weatherData) return '';
+  return `
+    <div class="paper-card p-4">
+      <h3 class="font-hand text-lg mb-3" style="color:var(--text)">오늘의 날씨</h3>
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        ${state.weatherData.map(c => {
+          const wc = weatherCodeInfo(c.current.weather_code);
+          return `
+            <div class="text-center p-3 rounded-xl" style="background:var(--bg-soft);">
+              <p class="text-xs mb-1" style="color:var(--text-muted)">${c.name}</p>
+              <p class="text-2xl leading-none">${wc.emoji}</p>
+              <p class="font-semibold text-lg mt-1" style="color:var(--text)">${Math.round(c.current.temperature_2m)}°</p>
+              <p class="text-xs" style="color:var(--text-muted)">${wc.label}</p>
+            </div>`;
+        }).join('')}
+      </div>
+      <p class="text-xs font-semibold mb-2" style="color:var(--text)">금주 날씨</p>
+      ${state.weatherData.map(c => `
+        <div class="mb-3">
+          <p class="text-xs mb-1" style="color:var(--text-muted)">${c.name}</p>
+          <div class="flex justify-between gap-1">
+            ${c.daily.time.map((d,i) => {
+              const wc = weatherCodeInfo(c.daily.weather_code[i]);
+              const dt = new Date(d);
+              const wd = ['일','월','화','수','목','금','토'][dt.getDay()];
+              return `
+                <div class="flex flex-col items-center gap-0.5 flex-1">
+                  <span class="text-[10px]" style="color:var(--text-muted)">${wd}</span>
+                  <span style="font-size:1rem;">${wc.emoji}</span>
+                  <span class="text-[10px]" style="color:var(--text)">${Math.round(c.daily.temperature_2m_max[i])}°</span>
+                  <span class="text-[10px]" style="color:var(--text-muted)">${Math.round(c.daily.temperature_2m_min[i])}°</span>
+                </div>`;
+            }).join('')}
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
+}
+
+/* ---------------- 홈 대시보드: 할 일 메모 위젯 (어제/오늘/내일) ---------------- */
+function todoWidgetsHtml(){
+  const anchor = state.homeAnchorDate || todayStr();
+  const [y,m,d] = anchor.split('-').map(Number);
+  const anchorDt = new Date(y, m-1, d);
+  const days = [-1,0,1].map(offset => {
+    const dt = new Date(anchorDt);
+    dt.setDate(dt.getDate()+offset);
+    const ds = toDateStr(dt);
+    const isRealToday = ds === todayStr();
+    const label = offset===-1 ? '어제' : offset===0 ? (isRealToday ? '오늘' : '선택한 날') : '내일';
+    return { date: ds, label, isRealToday };
+  });
+  return days.map(dObj => {
+    const text = (state.todos && state.todos[dObj.date]) || '';
+    return `
+      <div class="paper-card p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm font-semibold" style="color:var(--text)">${dObj.label} <span class="text-xs font-normal" style="color:var(--text-muted)">${formatDateKR(dObj.date, false)}</span></span>
+          ${dObj.isRealToday ? `<span class="text-[10px] px-2 py-0.5 rounded-full font-semibold" style="background:var(--brand-mint); color:#0F2822;">TODAY</span>` : ''}
+        </div>
+        <textarea class="todo-textarea w-full text-sm p-2" rows="4" data-todo-date="${dObj.date}"
+          placeholder="할 일을 적어보세요…"
+          style="background:var(--bg-soft); border:1px solid var(--border-soft); border-radius:10px; color:var(--text); resize:vertical;">${escapeHtml(text)}</textarea>
+      </div>`;
+  }).join('');
+}
+
+function wireTodoWidgets(){
+  document.querySelectorAll('.todo-textarea').forEach(ta => {
+    const doSaveTodo = debounce((date, value) => {
+      state.todos = DB.saveTodo(state.userId, date, value);
+    }, 500);
+    ta.addEventListener('input', (e) => { doSaveTodo(ta.getAttribute('data-todo-date'), e.target.value); });
+  });
+}
+
 function renderHome(){
   clearInterval(state.quoteTimer);
   const today = todayStr();
@@ -1052,7 +1322,7 @@ function renderHome(){
       <!-- 오늘의 운세 카드 -->
       <div class="paper-card p-5 my-6" style="background:#f7edf1;">
         <div class="flex items-center justify-between mb-3">
-          <h2 class="font-hand text-xl flex items-center gap-2" style="color:#000000">
+          <h2 class="font-hand text-xl flex items-center gap-2" style="color:var(--text)">
             <span>🔮</span> 오늘의 운세
           </h2>
           ${fortuneInput && !state.editingFortune ? `
