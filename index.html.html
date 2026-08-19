@@ -1,14 +1,15 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
 <title>OUR ARCHIVE</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com/">
+<link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gugi&family=Noto+Sans+KR:wght@300;400;500;600;700;800&family=Sekuya&display=swap" rel="stylesheet">
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
-<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.tailwindcss.com/"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{
@@ -336,6 +337,21 @@ kbd{
 @media (min-width: 641px){
   .mobile-tabbar{ display:none; }
 }
+
+/* ===== OUR ARCHIVE mobile home widgets ===== */
+.mobile-home-widgets{display:none;}
+@media (max-width:1500px){.side-panel{display:none !important;}}
+@media (max-width:640px){
+  .mobile-home-widgets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 22px;}
+  .mobile-home-widget{min-width:0;}
+  .mobile-home-widget summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;min-height:42px;padding:8px 4px;border:1px solid var(--border-soft);border-radius:14px;background:var(--surface);color:var(--text);font-size:12px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.04);}
+  .mobile-home-widget summary::-webkit-details-marker{display:none;}
+  .mobile-home-widget[open]{grid-column:1 / -1;}
+  .mobile-home-widget[open] summary{margin-bottom:8px;}
+  .mobile-home-widget .paper-card{width:100%;box-sizing:border-box;}
+  main.max-w-5xl{padding-left:14px !important;padding-right:14px !important;padding-top:14px !important;padding-bottom:80px !important;}
+  .mobile-home-widgets + p + h1{font-size:1.85rem !important;}
+}
 </style>
 </head>
 <body>
@@ -417,7 +433,7 @@ const DB = (() => {
   const K_DRAFT = 'diary_draft_v1';
   const K_THEME = 'diary_theme_v1';
   const K_FORTUNE = 'diary_fortune_input_v1';
-  
+
 
   const ID_SUFFIX = '@ourarchive.local';
   function usernameToEmail(username){
@@ -767,7 +783,7 @@ function highlightText(str, term){
   const esc = escapeHtml(str);
   if(!term) return esc;
   try{
-    const re = new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'gi');
+    const re = new RegExp('(' + term.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&') + ')', 'gi');
     return esc.replace(re, '<mark style="background:var(--accent-yellow); border-radius:4px; padding:0 2px;">$1</mark>');
   }catch(e){ return esc; }
 }
@@ -1428,6 +1444,11 @@ function renderHome(){
 
   const html = `
     <section class="fade-in mb-10">
+      <div class="mobile-home-widgets" aria-label="홈 위젯">
+        <details class="mobile-home-widget"><summary>📅 달력</summary><div class="mobile-widget-body">${miniCalendarHtml()}</div></details>
+        <details class="mobile-home-widget"><summary>☀️ 날씨</summary><div class="mobile-widget-body">${weatherWidgetHtml()}</div></details>
+        <details class="mobile-home-widget"><summary>✓ 할 일</summary><div class="mobile-widget-body">${todoWidgetsHtml()}</div></details>
+      </div>
       <p class="text-3sm font-bold mb-1" style="color:var(--text)">${formatDateKR(today)}</p>
       <h1 class="font-semibold text-4xl sm:text-5xl mb-3" style="color:#757370">어떤 하루, 어떤 생각</h1>
       <div style="overflow:hidden; min-height:1.6em;" class="mb-6">
@@ -1468,7 +1489,7 @@ function renderHome(){
         </div>
       ` : `<p class="text-sm" style="color:var(--text-muted)">No entries yet. Write your first day.</p>`}
     </section>
-    
+
       <!-- 하단 스티치 구분선 -->
       <div class="stitch my-8"></div>
     </section>
