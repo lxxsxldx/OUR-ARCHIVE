@@ -4,12 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
 <title>OUR ARCHIVE</title>
-<link rel="preconnect" href="[https://fonts.googleapis.com](https://fonts.googleapis.com/)">
-<link rel="preconnect" href="[https://fonts.gstatic.com](https://fonts.gstatic.com/)" crossorigin>
-<link href="[https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gugi&family=Noto+Sans+KR:wght@300;400;500;600;700;800&family=Sekuya&display=swap](https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gugi&family=Noto+Sans+KR:wght@300;400;500;600;700;800&family=Sekuya&display=swap)" rel="stylesheet">
-<link rel="stylesheet" as="style" crossorigin href="[https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css](https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css)" />
-<script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com/)"></script>
-<script src="[https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js](https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js)"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gugi&family=Noto+Sans+KR:wght@300;400;500;600;700;800&family=Sekuya&display=swap" rel="stylesheet">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{
   --bg:#86f7fd;
@@ -336,139 +336,6 @@ kbd{
 @media (min-width: 641px){
   .mobile-tabbar{ display:none; }
 }
-
-/* ================= 모바일 홈 위젯 ================= */
-.mobile-home-widgets{
-  display:none;
-}
-
-.mobile-widget-tabs{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:6px;
-  padding:5px;
-  margin-bottom:10px;
-  background:rgba(255,255,255,.72);
-  border:1px solid var(--border-soft);
-  border-radius:16px;
-  box-shadow:var(--shadow-sm);
-}
-
-.mobile-widget-tab{
-  border:none;
-  background:transparent;
-  color:var(--text-muted);
-  border-radius:11px;
-  padding:9px 4px;
-  font-size:.78rem;
-  font-weight:700;
-}
-
-.mobile-widget-tab.active{
-  background:var(--surface);
-  color:var(--text);
-  box-shadow:var(--shadow-sm);
-}
-
-.mobile-widget-panel{
-  display:none;
-}
-
-.mobile-widget-panel.active{
-  display:block;
-}
-
-.mobile-widget-panel .paper-card{
-  margin-bottom:0 !important;
-}
-
-@media (max-width: 640px){
-  body{
-    overflow-x:hidden;
-  }
-
-  #app{
-    padding-bottom:82px !important;
-  }
-
-  .mobile-home-widgets{
-    display:block;
-    width:100%;
-    max-width:640px;
-    margin:0 auto;
-    padding:10px 16px 0;
-  }
-
-  .mobile-home-widgets .side-panel-mobile-inner{
-    width:100%;
-  }
-
-  .mobile-home-widgets .weather-widget-mobile{
-    max-height:none;
-  }
-
-  .mobile-home-widgets .todo-mobile-list{
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-  }
-
-  .mobile-home-widgets .todo-pin-card{
-    width:100%;
-  }
-
-  .mobile-home-widgets .mini-cal-cell{
-    min-width:0;
-  }
-
-  .mobile-home-widgets .paper-card{
-    box-shadow:var(--shadow-sm);
-  }
-
-  main.max-w-5xl{
-    width:100%;
-    max-width:none;
-    padding-left:16px !important;
-    padding-right:16px !important;
-    padding-top:14px !important;
-  }
-
-  main.max-w-5xl .paper-card{
-    max-width:100%;
-  }
-
-  .mobile-home-widgets + main{
-    margin-top:0;
-  }
-
-  .mobile-home-widgets .weather-widget-mobile > .paper-card{
-    overflow:hidden;
-  }
-
-  .mobile-home-widgets .weather-widget-mobile .grid{
-    gap:8px !important;
-  }
-
-  .mobile-home-widgets .weather-widget-mobile .paper-card{
-    padding:12px !important;
-  }
-
-  .mobile-home-widgets .todo-mobile-list .todo-pin-card{
-    padding:13px !important;
-  }
-
-  .mobile-home-widgets .todo-new-input{
-    flex:1;
-    width:auto !important;
-  }
-}
-
-@media (min-width:641px){
-  .mobile-home-widgets{
-    display:none !important;
-  }
-}
-
 </style>
 </head>
 <body>
@@ -550,7 +417,7 @@ const DB = (() => {
   const K_DRAFT = 'diary_draft_v1';
   const K_THEME = 'diary_theme_v1';
   const K_FORTUNE = 'diary_fortune_input_v1';
-
+  
 
   const ID_SUFFIX = '@ourarchive.local';
   function usernameToEmail(username){
@@ -900,7 +767,7 @@ function highlightText(str, term){
   const esc = escapeHtml(str);
   if(!term) return esc;
   try{
-    const re = new RegExp('(' + term.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&') + ')', 'gi');
+    const re = new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'gi');
     return esc.replace(re, '<mark style="background:var(--accent-yellow); border-radius:4px; padding:0 2px;">$1</mark>');
   }catch(e){ return esc; }
 }
@@ -1053,34 +920,6 @@ function sidePanelsHtml(){
   `;
 }
 
-function mobileHomeWidgetsHtml(){
-  return `
-    <section class="mobile-home-widgets" aria-label="홈 위젯">
-      <div class="mobile-widget-tabs" role="tablist">
-        <button type="button" class="mobile-widget-tab active" data-mobile-widget="calendar">📅 달력</button>
-        <button type="button" class="mobile-widget-tab" data-mobile-widget="weather">☀️ 날씨</button>
-        <button type="button" class="mobile-widget-tab" data-mobile-widget="todo">✓ 할 일</button>
-      </div>
-
-      <div class="side-panel-mobile-inner">
-        <div class="mobile-widget-panel active" data-mobile-widget-panel="calendar">
-          ${miniCalendarHtml()}
-        </div>
-
-        <div class="mobile-widget-panel weather-widget-mobile" data-mobile-widget-panel="weather">
-          ${weatherWidgetHtml()}
-        </div>
-
-        <div class="mobile-widget-panel" data-mobile-widget-panel="todo">
-          <div class="todo-mobile-list">
-            ${todoWidgetsHtml()}
-          </div>
-        </div>
-      </div>
-    </section>
-  `;
-}
-
 function renderShell(innerHtml){
   const app = document.getElementById('app');
   app.innerHTML = `
@@ -1136,7 +975,6 @@ function renderShell(innerHtml){
         </div>
       </div>
     </header>
-    ${state.view === 'home' ? mobileHomeWidgetsHtml() : ''}
     <main class="max-w-5xl mx-auto px-5 pt-6">${innerHtml}</main>
     <nav class="mobile-tabbar fixed bottom-0 left-0 right-0 z-40 justify-around items-center py-2" style="background:var(--surface); border-top:1px solid var(--border-soft); box-shadow:0 -4px 14px -6px rgba(0,0,0,0.08);">
       ${NAV_ITEMS.map(it => `
@@ -1161,18 +999,6 @@ function renderShell(innerHtml){
       else { nav(target); }
     });
   });
-  app.querySelectorAll('[data-mobile-widget]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const target = btn.getAttribute('data-mobile-widget');
-      app.querySelectorAll('[data-mobile-widget]').forEach(tab => {
-        tab.classList.toggle('active', tab.getAttribute('data-mobile-widget') === target);
-      });
-      app.querySelectorAll('[data-mobile-widget-panel]').forEach(panel => {
-        panel.classList.toggle('active', panel.getAttribute('data-mobile-widget-panel') === target);
-      });
-    });
-  });
-
   wireMiniCalendar();
   wireTodoWidgets();
   document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
@@ -1382,9 +1208,9 @@ function miniCalendarHtml(){
   return `
     <div class="paper-card p-4" style="background:#ffffff;">
       <div class="flex items-center justify-between mb-3">
-        <button type="button" class="mini-cal-prev" class="btn-ghost !px-2 !py-1 text-xs">‹</button>
+        <button type="button" id="mini-cal-prev" class="btn-ghost !px-2 !py-1 text-xs">‹</button>
         <h3 class="font-hand text-lg" style="color:var(--text)">${year}. ${month+1}</h3>
-        <button type="button" class="mini-cal-next" class="btn-ghost !px-2 !py-1 text-xs">›</button>
+        <button type="button" id="mini-cal-next" class="btn-ghost !px-2 !py-1 text-xs">›</button>
       </div>
       <div class="grid grid-cols-7 gap-1 mb-1 text-center" style="font-size:.65rem; color:var(--text-muted)">
         ${['일','월','화','수','목','금','토'].map(d=>`<div>${d}</div>`).join('')}
@@ -1404,21 +1230,15 @@ function wireMiniCalendar(){
       renderApp();
     });
   });
-
-  document.querySelectorAll('.mini-cal-prev').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const c = state.homeCalCursor;
-      state.homeCalCursor = new Date(c.getFullYear(), c.getMonth()-1, 1);
-      renderApp();
-    });
+  document.getElementById('mini-cal-prev')?.addEventListener('click', () => {
+    const c = state.homeCalCursor;
+    state.homeCalCursor = new Date(c.getFullYear(), c.getMonth()-1, 1);
+    renderApp();
   });
-
-  document.querySelectorAll('.mini-cal-next').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const c = state.homeCalCursor;
-      state.homeCalCursor = new Date(c.getFullYear(), c.getMonth()+1, 1);
-      renderApp();
-    });
+  document.getElementById('mini-cal-next')?.addEventListener('click', () => {
+    const c = state.homeCalCursor;
+    state.homeCalCursor = new Date(c.getFullYear(), c.getMonth()+1, 1);
+    renderApp();
   });
 }
 
@@ -1648,7 +1468,7 @@ function renderHome(){
         </div>
       ` : `<p class="text-sm" style="color:var(--text-muted)">No entries yet. Write your first day.</p>`}
     </section>
-
+    
       <!-- 하단 스티치 구분선 -->
       <div class="stitch my-8"></div>
     </section>
