@@ -1197,7 +1197,7 @@ function renderApp(){
 /* ============================================================
    홈
    ============================================================ */
-/* ---------------- 홈 대시보드: 미니 달력 ---------------- */
+/* ---------------- 홈 대시보드: 미니 캘린더 ---------------- */
 function miniCalendarHtml(){
   const cursor = state.homeCalCursor;
   const year = cursor.getFullYear(), month = cursor.getMonth();
@@ -1446,7 +1446,7 @@ function renderHome(){
   const html = `
     <section class="fade-in mb-10">
       <div class="mobile-home-widgets" aria-label="홈 위젯">
-        <details class="mobile-home-widget"><summary>📅 달력</summary><div class="mobile-widget-body">${miniCalendarHtml()}</div></details>
+        <details class="mobile-home-widget"><summary>📅 캘린더</summary><div class="mobile-widget-body">${miniCalendarHtml()}</div></details>
         <details class="mobile-home-widget"><summary>☀️ 날씨</summary><div class="mobile-widget-body">${weatherWidgetHtml()}</div></details>
         <details class="mobile-home-widget"><summary>✓ 할 일</summary><div class="mobile-widget-body">${todoWidgetsHtml()}</div></details>
       </div>
@@ -1992,7 +1992,7 @@ function entryCardHighlightHtml(e){
     </div>`;
 }
 
-/* ---- 달력 페이지 ---- */
+/* ---- 캘린더 페이지 ---- */
 function renderCalendarPage(){
   const html = `
     <section class="fade-in pb-10">
