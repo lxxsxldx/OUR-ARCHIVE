@@ -1468,7 +1468,7 @@ function renderHome(){
 
       <div class="stitch my-8"></div>
 
-      <p class="text-sm font-semibold mb-3" style="color:var(--text)">오늘 기분 어때?</p>
+      <p class="text-sm font-semibold mb-3" style="color:var(--text)">오늘 내 기분은?</p>
       <div class="flex flex-wrap gap-3 mb-2" id="quick-mood-row">
         ${MOODS.map(m => `
           <button class="mood-pick ${state.quickMood===m.key?'selected':''}" data-quick-mood="${m.key}">
