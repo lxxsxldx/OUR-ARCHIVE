@@ -910,7 +910,7 @@ const NAV_ITEMS = [
   { key:'home',     label:'홈',     icon:'🏠' },
   { key:'write',    label:'기록하기', icon:'✍️' },
   { key:'list',     label:'내 기록', icon:'📔' },
-  { key:'calendar', label:'달력',   icon:'📅' },
+  { key:'calendar', label:'캘린더',   icon:'📅' },
   { key:'stats',    label:'통계',   icon:'📊' },
 ];
 
@@ -926,7 +926,7 @@ function sidePanelsHtml(){
       <div class="flex flex-col gap-2 mb-4">
         <button type="button" data-side-nav="write" class="btn-ghost text-xs !py-2 text-left">✍️ 오늘 일기 쓰기</button>
         <button type="button" data-side-nav="stats" class="btn-ghost text-xs !py-2 text-left">📊 감정 통계 보기</button>
-        <button type="button" data-side-nav="calendar" class="btn-ghost text-xs !py-2 text-left">📅 달력 보기</button>
+        <button type="button" data-side-nav="calendar" class="btn-ghost text-xs !py-2 text-left">📅 캘린더 보기</button>
       </div>
       <div class="double-divider my-4"></div>
       <div class="space-y-3">
@@ -1998,7 +1998,7 @@ function renderCalendarPage(){
     <section class="fade-in pb-10">
       <div class="flex items-end justify-between mb-5">
         <div>
-          <h1 class="font-hand text-3xl" style="color:var(--text)">달력</h1>
+          <h1 class="font-hand text-3xl" style="color:var(--text)">캘린더</h1>
           <p class="text-sm mt-1" style="color:var(--text-muted)">날짜를 눌러 그날의 일기와 할 일을 기록해보세요.</p>
         </div>
       </div>
