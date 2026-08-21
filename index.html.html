@@ -4,11 +4,11 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
 <title>OUR ARCHIVE</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com/">
+<link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gugi&family=Noto+Sans+KR:wght@300;400;500;600;700;800&family=Sekuya&display=swap" rel="stylesheet">
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
-<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.tailwindcss.com/"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{
@@ -325,51 +325,31 @@ kbd{
 .side-panel-right{ right: calc(50% - 512px - 16px - 200px); }
 .side-panel .chip{ cursor:pointer; border:none; }
 .side-panel .chip:hover{ background:var(--brand-pink); color:#fff; }
-/* 넓은 화면에서는 여백에 사이드 위젯을 배치하고,
-   태블릿/모바일에서는 화면 안쪽의 일반 콘텐츠처럼 표시 */
 @media (max-width: 1500px){
-  .side-panel{
-    position:static;
-    width:min(100% - 24px, 760px);
-    max-height:none;
-    margin:14px auto 0;
-  }
-  .side-panel-left{
-    left:auto;
-    right:auto;
-    display:flex;
-    flex-direction:column;
-    gap:12px;
-  }
-  .side-panel-right{
-    left:auto;
-    right:auto;
-  }
+  .side-panel{ display:none; }
 }
 
 @media (max-width: 640px){
   .desktop-nav{ display:none; }
   .mobile-tabbar{ display:flex; }
-  .side-panel{
-    width:calc(100% - 24px);
-    margin:12px auto 0;
-  }
-  .side-panel-left,
-  .side-panel-right{
-    display:flex;
-  }
-  .side-panel-right{
-    flex-direction:column;
-  }
-  .side-panel .paper-card{
-    border-radius:18px;
-  }
-  .side-panel-left > .paper-card{
-    width:100%;
-  }
 }
 @media (min-width: 641px){
   .mobile-tabbar{ display:none; }
+}
+
+/* ===== OUR ARCHIVE mobile home widgets ===== */
+.mobile-home-widgets{display:none;}
+@media (max-width:1500px){.side-panel{display:none !important;}}
+@media (max-width:640px){
+  .mobile-home-widgets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 22px;}
+  .mobile-home-widget{min-width:0;}
+  .mobile-home-widget summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;min-height:42px;padding:8px 4px;border:1px solid var(--border-soft);border-radius:14px;background:var(--surface);color:var(--text);font-size:12px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.04);}
+  .mobile-home-widget summary::-webkit-details-marker{display:none;}
+  .mobile-home-widget[open]{grid-column:1 / -1;}
+  .mobile-home-widget[open] summary{margin-bottom:8px;}
+  .mobile-home-widget .paper-card{width:100%;box-sizing:border-box;}
+  main.max-w-5xl{padding-left:14px !important;padding-right:14px !important;padding-top:14px !important;padding-bottom:80px !important;}
+  .mobile-home-widgets + p + h1{font-size:1.85rem !important;}
 }
 </style>
 </head>
@@ -452,7 +432,7 @@ const DB = (() => {
   const K_DRAFT = 'diary_draft_v1';
   const K_THEME = 'diary_theme_v1';
   const K_FORTUNE = 'diary_fortune_input_v1';
-  
+
 
   const ID_SUFFIX = '@ourarchive.local';
   function usernameToEmail(username){
@@ -802,7 +782,7 @@ function highlightText(str, term){
   const esc = escapeHtml(str);
   if(!term) return esc;
   try{
-    const re = new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'gi');
+    const re = new RegExp('(' + term.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&') + ')', 'gi');
     return esc.replace(re, '<mark style="background:var(--accent-yellow); border-radius:4px; padding:0 2px;">$1</mark>');
   }catch(e){ return esc; }
 }
@@ -927,10 +907,11 @@ function nav(view, params={}){
 
 /* ---------------- 셸(헤더 + 모바일 탭바) ---------------- */
 const NAV_ITEMS = [
-  { key:'home',  label:'Home',    icon:'🏠' },
-  { key:'write', label:'Write',   icon:'✍️' },
-  { key:'list',  label:'Entries', icon:'📔' },
-  { key:'stats', label:'Stats',   icon:'📊' },
+  { key:'home',     label:'홈',     icon:'🏠' },
+  { key:'write',    label:'기록하기', icon:'✍️' },
+  { key:'list',     label:'내 기록', icon:'📔' },
+  { key:'calendar', label:'달력',   icon:'📅' },
+  { key:'stats',    label:'통계',   icon:'📊' },
 ];
 
 /* ---------------- 고정 사이드 패널 (넓은 화면 여백 활용) ---------------- */
@@ -945,7 +926,7 @@ function sidePanelsHtml(){
       <div class="flex flex-col gap-2 mb-4">
         <button type="button" data-side-nav="write" class="btn-ghost text-xs !py-2 text-left">✍️ 오늘 일기 쓰기</button>
         <button type="button" data-side-nav="stats" class="btn-ghost text-xs !py-2 text-left">📊 감정 통계 보기</button>
-        <button type="button" data-side-nav="list" class="btn-ghost text-xs !py-2 text-left">📔 캘린더 보기</button>
+        <button type="button" data-side-nav="calendar" class="btn-ghost text-xs !py-2 text-left">📅 달력 보기</button>
       </div>
       <div class="double-divider my-4"></div>
       <div class="space-y-3">
@@ -1207,6 +1188,7 @@ function renderApp(){
   if(state.view === 'home') return renderHome();
   if(state.view === 'write') return renderWrite();
   if(state.view === 'list') return renderList();
+  if(state.view === 'calendar') return renderCalendarPage();
   if(state.view === 'detail') return renderDetail();
   if(state.view === 'stats') return renderStats();
   renderHome();
@@ -1355,7 +1337,7 @@ function todoWidgetsHtml(){
       <div class="paper-card p-4 todo-pin-card">
         <div class="flex items-center justify-between mb-2">
           <span class="text-sm font-semibold" style="color:var(--text)">${dObj.label} <span class="text-xs font-normal" style="color:var(--text-muted)">${formatDateKR(dObj.date, false)}</span></span>
-          ${dObj.isRealToday ? `<span class="text-[10px] px-2 py-0.5 rounded-full font-semibold" style="background:var(--brand-mint); color:#0F2822;">TODAY</span>` : ''}
+          ${dObj.isRealToday ? `<span class="text-[10px] px-2 py-0.5 rounded-full font-semibold" style="background:var(--brand-mint); color:#0F2822;">오늘</span>` : ''}
         </div>
         <div class="space-y-1.5 mb-2" data-todo-list="${dObj.date}">
           ${items.length ? items.map(it => todoItemHtml(dObj.date, it)).join('') : `<p class="text-xs" style="color:var(--text-muted)">할 일이 없어요.</p>`}
@@ -1463,6 +1445,11 @@ function renderHome(){
 
   const html = `
     <section class="fade-in mb-10">
+      <div class="mobile-home-widgets" aria-label="홈 위젯">
+        <details class="mobile-home-widget"><summary>📅 달력</summary><div class="mobile-widget-body">${miniCalendarHtml()}</div></details>
+        <details class="mobile-home-widget"><summary>☀️ 날씨</summary><div class="mobile-widget-body">${weatherWidgetHtml()}</div></details>
+        <details class="mobile-home-widget"><summary>✓ 할 일</summary><div class="mobile-widget-body">${todoWidgetsHtml()}</div></details>
+      </div>
       <p class="text-3sm font-bold mb-1" style="color:var(--text)">${formatDateKR(today)}</p>
       <h1 class="font-semibold text-4xl sm:text-5xl mb-3" style="color:#757370">어떤 하루, 어떤 생각</h1>
       <div style="overflow:hidden; min-height:1.6em;" class="mb-6">
@@ -1503,7 +1490,7 @@ function renderHome(){
         </div>
       ` : `<p class="text-sm" style="color:var(--text-muted)">No entries yet. Write your first day.</p>`}
     </section>
-    
+
       <!-- 하단 스티치 구분선 -->
       <div class="stitch my-8"></div>
     </section>
@@ -1631,6 +1618,16 @@ function entryCardHtml(e){
 /* ============================================================
    일기 쓰기
    ============================================================ */
+function beginWriteForDate(date){
+  state.draft = {
+    id: newId(), date: date || todayStr(), title:'', content:'',
+    mood: state.quickMood || '', weather:'', tags:[], images:[],
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  };
+  state.isEditing = false;
+  nav('write');
+}
+
 function beginWrite(entryId){
   if(entryId){
     const src = state.entries.find(e=>e.id===entryId);
@@ -1895,7 +1892,7 @@ function wireWritePage(){
 }
 
 /* ============================================================
-   내 일기 (목록 / 캘린더)
+   내 일기 (목록)
    ============================================================ */
 function renderList(){
   const allTags = Array.from(new Set(state.entries.flatMap(e => e.tags||[]))).sort();
@@ -1903,13 +1900,8 @@ function renderList(){
     <section class="fade-in pb-10">
       <div class="flex items-center justify-between mb-5">
         <h1 class="font-hand text-3xl" style="color:var(--text)">내 일기</h1>
-        <div class="flex gap-1 p-1 rounded-full" style="background:var(--bg-soft);">
-          <button id="mode-list" class="text-sm px-3 py-1.5 rounded-full ${state.listMode==='list'?'font-semibold':''}" style="background:${state.listMode==='list'?'var(--surface)':'transparent'}; color:var(--text); box-shadow:${state.listMode==='list'?'var(--shadow-sm)':'none'};">목록</button>
-          <button id="mode-cal" class="text-sm px-3 py-1.5 rounded-full ${state.listMode==='calendar'?'font-semibold':''}" style="background:${state.listMode==='calendar'?'var(--surface)':'transparent'}; color:var(--text); box-shadow:${state.listMode==='calendar'?'var(--shadow-sm)':'none'};">캘린더</button>
-        </div>
       </div>
 
-      ${state.listMode === 'list' ? `
         <div class="grid sm:grid-cols-2 gap-3 mb-4">
           <input id="search-title" type="text" placeholder="🔎 제목 검색" value="${escapeHtml(state.listSearchTitle)}"
             class="px-4 py-2.5 text-sm" style="background:var(--surface); border:1px solid var(--border-soft); border-radius:999px; color:var(--text);" />
@@ -1931,25 +1923,16 @@ function renderList(){
           </select>
         </div>
         <div id="entries-results"></div>
-      ` : `
-        <div id="calendar-wrap"></div>
-      `}
     </section>
   `;
   renderShell(html);
 
-  if(state.listMode === 'list'){
-    document.getElementById('search-title').addEventListener('input', (e) => { state.listSearchTitle = e.target.value; renderListResults(); });
+  document.getElementById('search-title').addEventListener('input', (e) => { state.listSearchTitle = e.target.value; renderListResults(); });
     document.getElementById('search-content').addEventListener('input', (e) => { state.listSearchContent = e.target.value; renderListResults(); });
     document.getElementById('filter-mood').addEventListener('change', (e) => { state.listMoodFilter = e.target.value; renderListResults(); });
     document.getElementById('filter-tag').addEventListener('change', (e) => { state.listTagFilter = e.target.value; renderListResults(); });
-    document.getElementById('sort-order').addEventListener('change', (e) => { state.listSort = e.target.value; renderListResults(); });
-    renderListResults();
-  } else {
-    renderCalendar();
-  }
-  document.getElementById('mode-list').addEventListener('click', () => { state.listMode='list'; renderList(); });
-  document.getElementById('mode-cal').addEventListener('click', () => { state.listMode='calendar'; renderList(); });
+  document.getElementById('sort-order').addEventListener('change', (e) => { state.listSort = e.target.value; renderListResults(); });
+  renderListResults();
 }
 
 function getFilteredEntries(){
@@ -2009,6 +1992,22 @@ function entryCardHighlightHtml(e){
     </div>`;
 }
 
+/* ---- 달력 페이지 ---- */
+function renderCalendarPage(){
+  const html = `
+    <section class="fade-in pb-10">
+      <div class="flex items-end justify-between mb-5">
+        <div>
+          <h1 class="font-hand text-3xl" style="color:var(--text)">달력</h1>
+          <p class="text-sm mt-1" style="color:var(--text-muted)">날짜를 눌러 그날의 일기와 할 일을 기록해보세요.</p>
+        </div>
+      </div>
+      <div id="calendar-wrap"></div>
+    </section>`;
+  renderShell(html);
+  renderCalendar();
+}
+
 /* ---- 캘린더 ---- */
 function renderCalendar(){
   const wrap = document.getElementById('calendar-wrap');
@@ -2020,31 +2019,23 @@ function renderCalendar(){
   const entriesByDate = {};
   state.entries.forEach(e => { (entriesByDate[e.date] = entriesByDate[e.date] || []).push(e); });
 
-  /* 일기뿐 아니라 과거에 저장해둔 할 일도 캘린더에서 날짜별로 확인 */
-  const todosByDate = state.todos || {};
-
   let cells = '';
   for(let i=0;i<startWeekday;i++) cells += `<div></div>`;
   for(let day=1; day<=daysInMonth; day++){
     const dateStr = `${year}-${pad2(month+1)}-${pad2(day)}`;
     const dayEntries = entriesByDate[dateStr] || [];
-    const dayTodos = todosByDate[dateStr] || [];
-    const hasTodo = dayTodos.length > 0;
     const isToday = dateStr === todayStr();
     const isSelected = dateStr === state.calendarSelectedDate;
     const dominant = dayEntries[0] ? moodOf(dayEntries[0].mood) : null;
     cells += `
-      <div class="cal-cell ${isToday?'today':''} ${dayEntries.length?'has-entry':''} ${hasTodo?'has-todo':''} ${isSelected?'selected':''}" data-date="${dateStr}"
-        style="background:${dayEntries.length ? (dominant?dominant.color:'var(--bg-soft)') : (hasTodo ? '#fff4f7' : 'transparent')}; color:${dayEntries.length || hasTodo ? 'var(--text)':'var(--text-muted)'};">
+      <div class="cal-cell ${isToday?'today':''} ${dayEntries.length?'has-entry':''} ${isSelected?'selected':''}" data-date="${dateStr}"
+        style="background:${dayEntries.length ? (dominant?dominant.color:'var(--bg-soft)') : 'transparent'}; color:${dayEntries.length ? 'var(--text)':'var(--text-muted)'};">
         <span style="font-size:.85rem;">${day}</span>
-        <span style="font-size:.7rem; min-height:12px;">${dayEntries.length ? (dominant?dominant.emoji:'') : ''}</span>
-        ${hasTodo ? `<span style="font-size:.62rem; line-height:1; color:var(--accent-pink);">● ${dayTodos.length}</span>` : ''}
+        ${dayEntries.length ? `<span style="font-size:.7rem;">${dominant?dominant.emoji:''}</span>` : ''}
       </div>`;
   }
 
-  const selectedDate = state.calendarSelectedDate;
-  const selectedEntries = selectedDate ? (entriesByDate[selectedDate] || []) : [];
-  const selectedTodos = selectedDate ? (todosByDate[selectedDate] || []) : [];
+  const selectedEntries = state.calendarSelectedDate ? (entriesByDate[state.calendarSelectedDate] || []) : [];
 
   wrap.innerHTML = `
     <div class="paper-card p-5 mb-5">
@@ -2059,36 +2050,37 @@ function renderCalendar(){
       <div class="grid grid-cols-7 gap-1.5">${cells}</div>
       <div class="flex flex-wrap gap-3 mt-4 pt-4 text-xs" style="border-top:1px solid var(--border-soft); color:var(--text-muted);">
         ${MOODS.map(m=>`<span class="flex items-center gap-1"><span style="width:9px;height:9px;border-radius:999px;background:${m.color};display:inline-block;"></span>${m.label}</span>`).join('')}
-        <span class="flex items-center gap-1"><span style="color:var(--accent-pink);">●</span> 할 일</span>
       </div>
     </div>
     <div id="cal-day-detail">
-      ${selectedDate ? `
-        <h4 class="font-semibold mb-3" style="color:var(--text)">${formatDateKR(selectedDate)}</h4>
-
-        ${selectedTodos.length ? `
-          <div class="paper-card p-4 mb-4 todo-pin-card" style="border-radius:4px;">
-            <div class="flex items-center justify-between mb-3">
-              <span class="font-semibold" style="color:var(--text)">📌 할 일</span>
-              <span class="text-xs" style="color:var(--text-muted)">${selectedTodos.length}개</span>
+      ${state.calendarSelectedDate ? `
+        <div class="paper-card p-5 mb-5">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h4 class="font-semibold" style="color:var(--text)">${formatDateKR(state.calendarSelectedDate)}</h4>
+              <p class="text-xs mt-1" style="color:var(--text-muted)">이 날짜에 남기고 싶은 기록을 선택하세요.</p>
             </div>
-            <div class="space-y-2">
-              ${selectedTodos.map(item => {
-                const s = TODO_STATUS[item.status] || TODO_STATUS.progress;
-                return `
-                  <div class="flex items-start gap-2 text-sm">
-                    <span style="width:24px; flex-shrink:0; color:${s.color}; font-weight:700; text-align:center;">${s.icon}</span>
-                    <span style="color:${item.status==='done'?'var(--text-muted)':'var(--text)'}; text-decoration:${item.status==='done'?'line-through':'none'}; white-space:pre-wrap; word-break:break-word;">${escapeHtml(item.text)}</span>
-                  </div>`;
-              }).join('')}
+            <div class="flex gap-2">
+              <button id="cal-add-diary" type="button" class="btn-ghost text-sm">✍️ 일기 쓰기</button>
+              <button id="cal-add-todo" type="button" class="text-sm px-4 py-2 rounded-full font-semibold" style="background:var(--text); color:var(--bg);">✓ 할 일 추가</button>
             </div>
           </div>
-        ` : ''}
-
-        ${selectedEntries.length ? `
-          <div class="grid sm:grid-cols-2 gap-3">${selectedEntries.map(e=>entryCardHtml(e)).join('')}</div>
-        ` : (!selectedTodos.length ? `<p class="text-sm" style="color:var(--text-muted)">이 날의 기록과 할 일이 없어요.</p>` : '')}
-      ` : `<p class="text-sm" style="color:var(--text-muted)">날짜를 선택해 그날의 일기와 할 일을 확인해보세요.</p>`}
+          ${selectedEntries.length ? `<div class="grid sm:grid-cols-2 gap-3">${selectedEntries.map(e=>entryCardHtml(e)).join('')}</div>` : `<p class="text-sm" style="color:var(--text-muted)">이 날에는 아직 일기가 없어요.</p>`}
+        </div>
+        <div class="paper-card p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="font-semibold" style="color:var(--text)">할 일</h4>
+            <span class="text-xs" style="color:var(--text-muted)">진행중 △ · 완료 ○ · 실패 ✕</span>
+          </div>
+          <div class="space-y-1.5 mb-3" data-todo-list="${state.calendarSelectedDate}">
+            ${((state.todos && state.todos[state.calendarSelectedDate]) || []).length ? ((state.todos[state.calendarSelectedDate] || []).map(it=>todoItemHtml(state.calendarSelectedDate,it)).join('')) : `<p class="text-xs" style="color:var(--text-muted)">등록된 할 일이 없어요.</p>`}
+          </div>
+          <div class="flex gap-2">
+            <input type="text" class="todo-new-input flex-1 text-sm px-3 py-2 rounded-xl" data-todo-new="${state.calendarSelectedDate}" placeholder="할 일을 입력해주세요" style="background:var(--bg-soft); border:1px solid var(--border-soft); color:var(--text);" />
+            <button type="button" class="text-sm px-4 py-2 rounded-xl font-semibold" data-todo-add="${state.calendarSelectedDate}" style="background:var(--text); color:var(--bg);">추가</button>
+          </div>
+        </div>
+      ` : `<p class="text-sm" style="color:var(--text-muted)">날짜를 선택해 그날의 기록을 확인하고 추가해보세요.</p>`}
     </div>
   `;
 
@@ -2098,6 +2090,11 @@ function renderCalendar(){
   wrap.querySelectorAll('.entry-card').forEach(card => {
     card.addEventListener('click', () => nav('detail', { entryId: card.getAttribute('data-id') }));
   });
+  document.getElementById('cal-add-diary')?.addEventListener('click', () => beginWriteForDate(state.calendarSelectedDate));
+  document.getElementById('cal-add-todo')?.addEventListener('click', () => {
+    document.querySelector(`[data-todo-new="${state.calendarSelectedDate}"]`)?.focus();
+  });
+  wireTodoWidgets();
   document.getElementById('cal-prev').addEventListener('click', () => { state.calendarCursor = new Date(year, month-1, 1); renderCalendar(); });
   document.getElementById('cal-next').addEventListener('click', () => { state.calendarCursor = new Date(year, month+1, 1); renderCalendar(); });
 }
@@ -2259,6 +2256,7 @@ document.addEventListener('keydown', (e) => {
   if(e.key === 'n' || e.key === 'N'){ beginWrite(); }
   if(e.key === 'h' || e.key === 'H'){ nav('home'); }
   if(e.key === 'l' || e.key === 'L'){ nav('list'); }
+  if(e.key === 'c' || e.key === 'C'){ nav('calendar'); }
 });
 
 /* ---------------- 초기 실행 ---------------- */
