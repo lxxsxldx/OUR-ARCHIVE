@@ -1337,7 +1337,7 @@ function todoWidgetsHtml(){
       <div class="paper-card p-4 todo-pin-card">
         <div class="flex items-center justify-between mb-2">
           <span class="text-sm font-semibold" style="color:var(--text)">${dObj.label} <span class="text-xs font-normal" style="color:var(--text-muted)">${formatDateKR(dObj.date, false)}</span></span>
-          ${dObj.isRealToday ? `<span class="text-[10px] px-4 py-0.5 rounded-full font-semibold" style="background:#8ac0a3; color:#0F2822;">오늘</span>` : ''}
+          ${dObj.isRealToday ? `<span class="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style="background:#8ac0a3; color:#0F2822;">오늘</span>` : ''}
         </div>
         <div class="space-y-1.5 mb-2" data-todo-list="${dObj.date}">
           ${items.length ? items.map(it => todoItemHtml(dObj.date, it)).join('') : `<p class="text-xs" style="color:var(--text-muted)">할 일이 없어요.</p>`}
