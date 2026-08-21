@@ -110,12 +110,11 @@ input:focus, textarea:focus, select:focus, button:focus-visible{
   position:absolute;
   top:0;
   right:0;
-  width:0;
-  height:0;
-  border-style:solid;
-  border-width:0 22px 22px 0;
-  border-color:transparent #efe8f7 transparent transparent;
-  filter:drop-shadow(-1px 1px 1px rgba(0,0,0,0.06));
+  width:24px;
+  height:24px;
+  background:#efe8f7;
+  clip-path:polygon(0 0, 100% 100%, 100% 0);
+  filter:drop-shadow(-1px 1px 1px rgba(0,0,0,.1));
 }
 .entry-card{
   background:#f7edf1;
