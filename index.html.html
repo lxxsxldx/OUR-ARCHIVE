@@ -921,7 +921,7 @@ function sidePanelsHtml(){
       ${miniCalendarHtml()}
       ${weatherWidgetHtml()}
     </aside>
-    <aside class="side-panel side-panel-right paper-card p-4" style="background:#f7f4e8;">
+    <aside class="side-panel side-panel-right paper-card p-4" style="background:#faf7ef;">
       <h4 class="font-hand text-lg mb-3" style="color:var(--text)">바로가기</h4>
       <div class="flex flex-col gap-2 mb-4">
         <button type="button" data-side-nav="write" class="btn-ghost text-xs !py-2 text-left">✍️ 오늘 일기 쓰기</button>
@@ -1223,7 +1223,7 @@ function miniCalendarHtml(){
   }
 
   return `
-    <div class="paper-card p-4" style="background:#f7f4e8;">
+    <div class="paper-card p-4" style="background:#faf7ef;">
       <div class="flex items-center justify-between mb-3">
         <button type="button" id="mini-cal-prev" class="btn-ghost !px-2 !py-1 text-xs">‹</button>
         <h3 class="font-hand text-lg" style="color:var(--text)">${year}. ${month+1}</h3>
@@ -1269,7 +1269,7 @@ function weatherWidgetHtml(){
   }
   if(!state.weatherData) return '';
   return `
-    <div class="paper-card p-4" style="background:#f7f4e8;">
+    <div class="paper-card p-4" style="background:#faf7ef;">
       <h3 class="font-hand text-lg mb-3" style="color:var(--text)">오늘의 날씨</h3>
       <div class="grid grid-cols-2 gap-3 mb-4">
         ${state.weatherData.map(c => {
