@@ -120,7 +120,7 @@ input:focus, textarea:focus, select:focus, button:focus-visible{
 }
 
 .todo-pin-card{
-  border-radius:4px !important;
+  border-radius:10px !important;
   background:#e9e8f7 !important;
   overflow:visible !important;
   position:relative;
@@ -129,14 +129,14 @@ input:focus, textarea:focus, select:focus, button:focus-visible{
 .todo-pin-card::before{
   content:"";
   position:absolute;
-  top:-9px;
+  top:-10px;
   left:50%;
-  transform:translateX(-50%);
-  width:16px;
-  height:16px;
-  border-radius:50%;
-  background:radial-gradient(circle at 30% 30%, #ff8a80, #c62828);
-  box-shadow:0 3px 4px rgba(0,0,0,0.35), inset 0 1px 1px rgba(255,255,255,0.5);
+  transform:translateX(-50%) rotate(-12deg);
+  width:9px;
+  height:25px;
+  border:2px solid #CFA365;
+  border-radius:8px;
+  background:transparent;
   z-index:5;
 }
 
