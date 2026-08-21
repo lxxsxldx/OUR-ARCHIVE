@@ -1262,14 +1262,14 @@ function wireMiniCalendar(){
 /* ---------------- 홈 대시보드: 날씨 위젯 ---------------- */
 function weatherWidgetHtml(){
   if(state.weatherLoading && !state.weatherData){
-    return `<div class="paper-card p-4" style="background:#FFF9D2;"><p class="text-sm" style="color:var(--text-muted)">날씨 정보를 불러오는 중…</p></div>`;
+    return `<div class="paper-card p-4" style="background:#ffffff;"><p class="text-sm" style="color:var(--text-muted)">날씨 정보를 불러오는 중…</p></div>`;
   }
   if(state.weatherError && !state.weatherData){
-    return `<div class="paper-card p-4" style="background:#FFF9D2;"><p class="text-sm" style="color:var(--text-muted)">${escapeHtml(state.weatherError)}</p></div>`;
+    return `<div class="paper-card p-4" style="background:#ffffff;"><p class="text-sm" style="color:var(--text-muted)">${escapeHtml(state.weatherError)}</p></div>`;
   }
   if(!state.weatherData) return '';
   return `
-    <div class="paper-card p-4" style="background:#ffffff;">
+    <div class="paper-card p-4" style="background:#FFF9D2;">
       <h3 class="font-hand text-lg mb-3" style="color:var(--text)">오늘의 날씨</h3>
       <div class="grid grid-cols-2 gap-3 mb-4">
         ${state.weatherData.map(c => {
