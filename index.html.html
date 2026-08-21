@@ -1275,7 +1275,7 @@ function weatherWidgetHtml(){
         ${state.weatherData.map(c => {
           const wc = weatherCodeInfo(c.current.weather_code);
           return `
-            <div class="text-center p-3 rounded-xl" style="background:var(--bg-soft);">
+            <div class="text-center p-3 rounded-xl" style="background:#D0C7EE;">
               <p class="text-xs mb-1" style="color:var(--text-muted)">${c.name}</p>
               <p class="text-2xl leading-none">${wc.emoji}</p>
               <p class="font-semibold text-lg mt-1" style="color:var(--text)">${Math.round(c.current.temperature_2m)}°</p>
