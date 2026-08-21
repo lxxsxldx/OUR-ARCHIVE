@@ -2020,23 +2020,31 @@ function renderCalendar(){
   const entriesByDate = {};
   state.entries.forEach(e => { (entriesByDate[e.date] = entriesByDate[e.date] || []).push(e); });
 
+  /* 일기뿐 아니라 과거에 저장해둔 할 일도 캘린더에서 날짜별로 확인 */
+  const todosByDate = state.todos || {};
+
   let cells = '';
   for(let i=0;i<startWeekday;i++) cells += `<div></div>`;
   for(let day=1; day<=daysInMonth; day++){
     const dateStr = `${year}-${pad2(month+1)}-${pad2(day)}`;
     const dayEntries = entriesByDate[dateStr] || [];
+    const dayTodos = todosByDate[dateStr] || [];
+    const hasTodo = dayTodos.length > 0;
     const isToday = dateStr === todayStr();
     const isSelected = dateStr === state.calendarSelectedDate;
     const dominant = dayEntries[0] ? moodOf(dayEntries[0].mood) : null;
     cells += `
-      <div class="cal-cell ${isToday?'today':''} ${dayEntries.length?'has-entry':''} ${isSelected?'selected':''}" data-date="${dateStr}"
-        style="background:${dayEntries.length ? (dominant?dominant.color:'var(--bg-soft)') : 'transparent'}; color:${dayEntries.length ? 'var(--text)':'var(--text-muted)'};">
+      <div class="cal-cell ${isToday?'today':''} ${dayEntries.length?'has-entry':''} ${hasTodo?'has-todo':''} ${isSelected?'selected':''}" data-date="${dateStr}"
+        style="background:${dayEntries.length ? (dominant?dominant.color:'var(--bg-soft)') : (hasTodo ? '#fff4f7' : 'transparent')}; color:${dayEntries.length || hasTodo ? 'var(--text)':'var(--text-muted)'};">
         <span style="font-size:.85rem;">${day}</span>
-        ${dayEntries.length ? `<span style="font-size:.7rem;">${dominant?dominant.emoji:''}</span>` : ''}
+        <span style="font-size:.7rem; min-height:12px;">${dayEntries.length ? (dominant?dominant.emoji:'') : ''}</span>
+        ${hasTodo ? `<span style="font-size:.62rem; line-height:1; color:var(--accent-pink);">● ${dayTodos.length}</span>` : ''}
       </div>`;
   }
 
-  const selectedEntries = state.calendarSelectedDate ? (entriesByDate[state.calendarSelectedDate] || []) : [];
+  const selectedDate = state.calendarSelectedDate;
+  const selectedEntries = selectedDate ? (entriesByDate[selectedDate] || []) : [];
+  const selectedTodos = selectedDate ? (todosByDate[selectedDate] || []) : [];
 
   wrap.innerHTML = `
     <div class="paper-card p-5 mb-5">
@@ -2051,13 +2059,36 @@ function renderCalendar(){
       <div class="grid grid-cols-7 gap-1.5">${cells}</div>
       <div class="flex flex-wrap gap-3 mt-4 pt-4 text-xs" style="border-top:1px solid var(--border-soft); color:var(--text-muted);">
         ${MOODS.map(m=>`<span class="flex items-center gap-1"><span style="width:9px;height:9px;border-radius:999px;background:${m.color};display:inline-block;"></span>${m.label}</span>`).join('')}
+        <span class="flex items-center gap-1"><span style="color:var(--accent-pink);">●</span> 할 일</span>
       </div>
     </div>
     <div id="cal-day-detail">
-      ${state.calendarSelectedDate ? `
-        <h4 class="font-semibold mb-3" style="color:var(--text)">${formatDateKR(state.calendarSelectedDate)}</h4>
-        ${selectedEntries.length ? `<div class="grid sm:grid-cols-2 gap-3">${selectedEntries.map(e=>entryCardHtml(e)).join('')}</div>` : `<p class="text-sm" style="color:var(--text-muted)">이 날의 기록이 없어요.</p>`}
-      ` : `<p class="text-sm" style="color:var(--text-muted)">날짜를 선택해 그날의 기록을 확인해보세요.</p>`}
+      ${selectedDate ? `
+        <h4 class="font-semibold mb-3" style="color:var(--text)">${formatDateKR(selectedDate)}</h4>
+
+        ${selectedTodos.length ? `
+          <div class="paper-card p-4 mb-4 todo-pin-card" style="border-radius:4px;">
+            <div class="flex items-center justify-between mb-3">
+              <span class="font-semibold" style="color:var(--text)">📌 할 일</span>
+              <span class="text-xs" style="color:var(--text-muted)">${selectedTodos.length}개</span>
+            </div>
+            <div class="space-y-2">
+              ${selectedTodos.map(item => {
+                const s = TODO_STATUS[item.status] || TODO_STATUS.progress;
+                return `
+                  <div class="flex items-start gap-2 text-sm">
+                    <span style="width:24px; flex-shrink:0; color:${s.color}; font-weight:700; text-align:center;">${s.icon}</span>
+                    <span style="color:${item.status==='done'?'var(--text-muted)':'var(--text)'}; text-decoration:${item.status==='done'?'line-through':'none'}; white-space:pre-wrap; word-break:break-word;">${escapeHtml(item.text)}</span>
+                  </div>`;
+              }).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        ${selectedEntries.length ? `
+          <div class="grid sm:grid-cols-2 gap-3">${selectedEntries.map(e=>entryCardHtml(e)).join('')}</div>
+        ` : (!selectedTodos.length ? `<p class="text-sm" style="color:var(--text-muted)">이 날의 기록과 할 일이 없어요.</p>` : '')}
+      ` : `<p class="text-sm" style="color:var(--text-muted)">날짜를 선택해 그날의 일기와 할 일을 확인해보세요.</p>`}
     </div>
   `;
 
