@@ -1223,7 +1223,7 @@ function miniCalendarHtml(){
   }
 
   return `
-    <div class="paper-card p-4" style="background:#ffffff;">
+    <div class="paper-card p-4" style="background:#FFF9D2;">
       <div class="flex items-center justify-between mb-3">
         <button type="button" id="mini-cal-prev" class="btn-ghost !px-2 !py-1 text-xs">‹</button>
         <h3 class="font-hand text-lg" style="color:var(--text)">${year}. ${month+1}</h3>
@@ -1262,10 +1262,10 @@ function wireMiniCalendar(){
 /* ---------------- 홈 대시보드: 날씨 위젯 ---------------- */
 function weatherWidgetHtml(){
   if(state.weatherLoading && !state.weatherData){
-    return `<div class="paper-card p-4" style="background:#ffffff;"><p class="text-sm" style="color:var(--text-muted)">날씨 정보를 불러오는 중…</p></div>`;
+    return `<div class="paper-card p-4" style="background:#FFF9D2;"><p class="text-sm" style="color:var(--text-muted)">날씨 정보를 불러오는 중…</p></div>`;
   }
   if(state.weatherError && !state.weatherData){
-    return `<div class="paper-card p-4" style="background:#ffffff;"><p class="text-sm" style="color:var(--text-muted)">${escapeHtml(state.weatherError)}</p></div>`;
+    return `<div class="paper-card p-4" style="background:#FFF9D2;"><p class="text-sm" style="color:var(--text-muted)">${escapeHtml(state.weatherError)}</p></div>`;
   }
   if(!state.weatherData) return '';
   return `
