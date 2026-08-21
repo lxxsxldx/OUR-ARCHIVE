@@ -325,13 +325,48 @@ kbd{
 .side-panel-right{ right: calc(50% - 512px - 16px - 200px); }
 .side-panel .chip{ cursor:pointer; border:none; }
 .side-panel .chip:hover{ background:var(--brand-pink); color:#fff; }
+/* 넓은 화면에서는 여백에 사이드 위젯을 배치하고,
+   태블릿/모바일에서는 화면 안쪽의 일반 콘텐츠처럼 표시 */
 @media (max-width: 1500px){
-  .side-panel{ display:none; }
+  .side-panel{
+    position:static;
+    width:min(100% - 24px, 760px);
+    max-height:none;
+    margin:14px auto 0;
+  }
+  .side-panel-left{
+    left:auto;
+    right:auto;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .side-panel-right{
+    left:auto;
+    right:auto;
+  }
 }
 
 @media (max-width: 640px){
   .desktop-nav{ display:none; }
   .mobile-tabbar{ display:flex; }
+  .side-panel{
+    width:calc(100% - 24px);
+    margin:12px auto 0;
+  }
+  .side-panel-left,
+  .side-panel-right{
+    display:flex;
+  }
+  .side-panel-right{
+    flex-direction:column;
+  }
+  .side-panel .paper-card{
+    border-radius:18px;
+  }
+  .side-panel-left > .paper-card{
+    width:100%;
+  }
 }
 @media (min-width: 641px){
   .mobile-tabbar{ display:none; }
