@@ -342,7 +342,7 @@ kbd{
 .mobile-home-widgets{display:none;}
 @media (max-width:1500px){.side-panel{display:none !important;}}
 @media (max-width:640px){
-  .mobile-home-widgets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:22px 0 0;}
+  .mobile-home-widgets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:22px 0 0;}
   .mobile-home-widget{min-width:0;}
   .mobile-home-widget summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;min-height:42px;padding:8px 4px;border:1px solid var(--border-soft);border-radius:14px;background:var(--surface);color:var(--text);font-size:12px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.04);}
   .mobile-home-widget summary::-webkit-details-marker{display:none;}
@@ -859,7 +859,7 @@ const state = {
   weatherData: null,
   weatherLoading: false,
   weatherError: null,
-  mobileWidgetOpen: { cal:false, weather:false, todo:false },
+  mobileWidgetOpen: { cal:false, weather:false, todo:false, shortcuts:false },
 };
 
 if(state.theme === 'dark'){ document.documentElement.classList.add('dark'); }
@@ -1544,6 +1544,13 @@ function renderHome(){
       <div class="mobile-home-widgets" aria-label="홈 위젯">
         <details class="mobile-home-widget" data-widget-key="cal" ${state.mobileWidgetOpen.cal ? 'open' : ''}><summary>📅 캘린더</summary><div class="mobile-widget-body">${miniCalendarHtml()}</div></details>
         <details class="mobile-home-widget" data-widget-key="weather" ${state.mobileWidgetOpen.weather ? 'open' : ''}><summary>☀️ 날씨</summary><div class="mobile-widget-body">${weatherWidgetHtml()}</div></details>
+        <details class="mobile-home-widget" data-widget-key="shortcuts" ${state.mobileWidgetOpen.shortcuts ? 'open' : ''}><summary>🔗 바로가기</summary><div class="mobile-widget-body paper-card p-4" style="background:#faf7ef;">
+          <div class="flex flex-col gap-2">
+            <button type="button" data-side-nav="write" class="btn-ghost text-xs !py-2 text-left">✍️ 오늘 일기 쓰기</button>
+            <button type="button" data-side-nav="stats" class="btn-ghost text-xs !py-2 text-left">📊 감정 통계 보기</button>
+            <button type="button" data-side-nav="calendar" class="btn-ghost text-xs !py-2 text-left">📅 캘린더 보기</button>
+          </div>
+        </div></details>
         <details class="mobile-home-widget" data-widget-key="todo" ${state.mobileWidgetOpen.todo ? 'open' : ''}><summary>✓ 할 일</summary><div class="mobile-widget-body">${todoWidgetsHtml()}</div></details>
       </div>
 
