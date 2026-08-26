@@ -342,7 +342,7 @@ kbd{
 .mobile-home-widgets{display:none;}
 @media (max-width:1500px){.side-panel{display:none !important;}}
 @media (max-width:640px){
-  .mobile-home-widgets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:22px 0 0;}
+  .mobile-home-widgets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 22px;}
   .mobile-home-widget{min-width:0;}
   .mobile-home-widget summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;min-height:42px;padding:8px 4px;border:1px solid var(--border-soft);border-radius:14px;background:var(--surface);color:var(--text);font-size:12px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.04);}
   .mobile-home-widget summary::-webkit-details-marker{display:none;}
@@ -350,6 +350,7 @@ kbd{
   .mobile-home-widget[open] summary{margin-bottom:8px;}
   .mobile-home-widget .paper-card{width:100%;box-sizing:border-box;}
   main.max-w-5xl{padding-left:14px !important;padding-right:14px !important;padding-top:14px !important;padding-bottom:80px !important;}
+  .mobile-home-widgets + p + h1{font-size:1.85rem !important;}
 }
 </style>
 </head>
@@ -859,7 +860,6 @@ const state = {
   weatherData: null,
   weatherLoading: false,
   weatherError: null,
-  mobileWidgetOpen: { cal:false, weather:false, todo:false, shortcuts:false },
 };
 
 if(state.theme === 'dark'){ document.documentElement.classList.add('dark'); }
@@ -1018,7 +1018,6 @@ function renderShell(innerHtml){
   });
   wireMiniCalendar();
   wireTodoWidgets();
-  wireMobileWidgets();
   document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
   document.getElementById('logout-btn').addEventListener('click', () => {
     showModal({
@@ -1227,9 +1226,9 @@ function miniCalendarHtml(){
   return `
     <div class="paper-card p-4" style="background:#faf7ef;">
       <div class="flex items-center justify-between mb-3">
-        <button type="button" class="mini-cal-prev-btn btn-ghost !px-2 !py-1 text-xs">‹</button>
+        <button type="button" id="mini-cal-prev" class="btn-ghost !px-2 !py-1 text-xs">‹</button>
         <h3 class="font-hand text-lg" style="color:var(--text)">${year}. ${month+1}</h3>
-        <button type="button" class="mini-cal-next-btn btn-ghost !px-2 !py-1 text-xs">›</button>
+        <button type="button" id="mini-cal-next" class="btn-ghost !px-2 !py-1 text-xs">›</button>
       </div>
       <div class="grid grid-cols-7 gap-1 mb-1 text-center" style="font-size:.65rem; color:var(--text-muted)">
         ${['일','월','화','수','목','금','토'].map(d=>`<div>${d}</div>`).join('')}
@@ -1249,29 +1248,15 @@ function wireMiniCalendar(){
       renderApp();
     });
   });
-  document.querySelectorAll('.mini-cal-prev-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const c = state.homeCalCursor;
-      state.homeCalCursor = new Date(c.getFullYear(), c.getMonth()-1, 1);
-      renderApp();
-    });
+  document.getElementById('mini-cal-prev')?.addEventListener('click', () => {
+    const c = state.homeCalCursor;
+    state.homeCalCursor = new Date(c.getFullYear(), c.getMonth()-1, 1);
+    renderApp();
   });
-  document.querySelectorAll('.mini-cal-next-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const c = state.homeCalCursor;
-      state.homeCalCursor = new Date(c.getFullYear(), c.getMonth()+1, 1);
-      renderApp();
-    });
-  });
-}
-
-/* ---------------- 모바일 홈 위젯 (캘린더/날씨/할 일) open 상태 유지 ---------------- */
-function wireMobileWidgets(){
-  document.querySelectorAll('.mobile-home-widget[data-widget-key]').forEach(el => {
-    el.addEventListener('toggle', () => {
-      const key = el.getAttribute('data-widget-key');
-      state.mobileWidgetOpen[key] = el.open;
-    });
+  document.getElementById('mini-cal-next')?.addEventListener('click', () => {
+    const c = state.homeCalCursor;
+    state.homeCalCursor = new Date(c.getFullYear(), c.getMonth()+1, 1);
+    renderApp();
   });
 }
 
@@ -1461,6 +1446,11 @@ function renderHome(){
 
   const html = `
     <section class="fade-in mb-10">
+      <div class="mobile-home-widgets" aria-label="홈 위젯">
+        <details class="mobile-home-widget"><summary>📅 캘린더</summary><div class="mobile-widget-body">${miniCalendarHtml()}</div></details>
+        <details class="mobile-home-widget"><summary>☀️ 날씨</summary><div class="mobile-widget-body">${weatherWidgetHtml()}</div></details>
+        <details class="mobile-home-widget"><summary>✓ 할 일</summary><div class="mobile-widget-body">${todoWidgetsHtml()}</div></details>
+      </div>
       <p class="text-3sm font-bold mb-1" style="color:var(--text)">${formatDateKR(today)}</p>
       <h1 class="font-semibold text-4xl sm:text-5xl mb-3" style="color:#5c5b5a">조각 모음.zip</h1>
       <div style="overflow:hidden; min-height:1.6em;" class="mb-6">
@@ -1539,19 +1529,6 @@ function renderHome(){
         ` : `
           ${fortuneResultHtml(fortuneCalc)}
         `}
-      </div>
-
-      <div class="mobile-home-widgets" aria-label="홈 위젯">
-        <details class="mobile-home-widget" data-widget-key="cal" ${state.mobileWidgetOpen.cal ? 'open' : ''}><summary>📅 캘린더</summary><div class="mobile-widget-body">${miniCalendarHtml()}</div></details>
-        <details class="mobile-home-widget" data-widget-key="weather" ${state.mobileWidgetOpen.weather ? 'open' : ''}><summary>☀️ 날씨</summary><div class="mobile-widget-body">${weatherWidgetHtml()}</div></details>
-        <details class="mobile-home-widget" data-widget-key="shortcuts" ${state.mobileWidgetOpen.shortcuts ? 'open' : ''}><summary>🔗 바로가기</summary><div class="mobile-widget-body paper-card p-4" style="background:#faf7ef;">
-          <div class="flex flex-col gap-2">
-            <button type="button" data-side-nav="write" class="btn-ghost text-xs !py-2 text-left">✍️ 오늘 일기 쓰기</button>
-            <button type="button" data-side-nav="stats" class="btn-ghost text-xs !py-2 text-left">📊 감정 통계 보기</button>
-            <button type="button" data-side-nav="calendar" class="btn-ghost text-xs !py-2 text-left">📅 캘린더 보기</button>
-          </div>
-        </div></details>
-        <details class="mobile-home-widget" data-widget-key="todo" ${state.mobileWidgetOpen.todo ? 'open' : ''}><summary>✓ 할 일</summary><div class="mobile-widget-body">${todoWidgetsHtml()}</div></details>
       </div>
 
   `;
