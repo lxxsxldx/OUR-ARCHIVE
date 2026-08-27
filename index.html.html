@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -653,97 +654,647 @@ const QUOTES = [
   '오늘도 나답게, 내일도 나답게 살아가자.',
 ];
 
-/* 오늘의 운세용 문구 풀 */
-const FORTUNE_LINES = {
-  great: [
-    '오늘은 하는 일마다 술술 풀리는 날이에요.',
-    '작은 용기를 내면 예상보다 큰 행운이 따라와요.',
-    '주변 사람과의 인연이 좋은 소식을 가져다줄 수 있어요.',
-    '평소보다 자신감 있게 움직여도 좋은 하루예요.',
-    '미뤄뒀던 일을 시작하기에 딱 좋은 타이밍이에요.',
-    '기분 좋은 우연이 하루 중 한 번은 찾아올 거예요.',
-    '마음먹은 대로 흘러가는 흐름이 느껴지는 날이에요.',
-    '누군가에게 받는 작은 칭찬이 큰 힘이 될 수 있어요.',
-  ],
-  good: [
-    '차분하게 준비한 일들이 무난하게 마무리돼요.',
-    '평온한 흐름 속에서 작은 성취를 느낄 수 있어요.',
-    '가까운 사람과의 대화가 마음을 편하게 해줘요.',
-    '무리하지 않으면 기분 좋게 하루를 마칠 수 있어요.',
-    '오늘의 선택들이 대체로 좋은 방향으로 이어져요.',
-    '소소한 여유를 즐기기에 알맞은 하루예요.',
-    '계획한 만큼만 해내도 충분히 만족스러운 날이에요.',
-    '작은 변화가 기분 전환에 도움이 될 수 있어요.',
-  ],
-  normal: [
-    '평범하지만 나쁘지 않은 흐름의 하루예요.',
-    '큰 기복 없이 안정적으로 흘러갈 거예요.',
-    '무리한 결정보다는 신중한 판단이 필요해요.',
-    '평소 하던 대로만 해도 무난하게 지나가는 날이에요.',
-    '작은 실수는 있어도 크게 문제되지 않아요.',
-    '기대와 현실이 비슷하게 맞아떨어지는 하루예요.',
-    '컨디션 관리를 조금 더 신경 쓰면 좋아요.',
-    '차분히 하루를 정리하며 보내는 것도 좋겠어요.',
-  ],
-  tough: [
-    '평소보다 조금 신중하게 움직이는 게 좋은 날이에요.',
-    '중요한 결정은 잠시 미뤄두는 편이 나을 수 있어요.',
-    '사소한 오해가 생기지 않도록 말을 아끼는 게 좋아요.',
-    '컨디션이 흔들릴 수 있으니 무리하지 않길 바라요.',
-    '급한 마음보다는 여유를 갖는 게 도움이 돼요.',
-    '작은 일에도 꼼꼼히 확인하는 습관이 필요한 날이에요.',
-    '예상치 못한 변수에 유연하게 대처해보세요.',
-    '오늘은 남 탓보다 나를 다독이는 게 먼저예요.',
-  ],
-  hard: [
-    '오늘은 평소보다 한 박자 쉬어가는 게 좋아요.',
-    '무리한 도전보다는 익숙한 방식이 안전해요.',
-    '컨디션이 좋지 않다면 충분히 쉬어주세요.',
-    '감정이 앞서기 쉬운 날이니 한 템포 늦추는 게 좋아요.',
-    '중요한 약속이나 결정은 다음으로 미뤄도 괜찮아요.',
-    '작은 다툼이 생기지 않도록 주의가 필요해요.',
-    '오늘 힘들었다면 스스로를 탓하지 않아도 돼요.',
-    '내일은 오늘보다 나아질 거라는 걸 기억해주세요.',
-  ],
+/* ============================================================
+   사주 / 만세력 기반 오늘의 운세 엔진
+   ------------------------------------------------------------
+   - 두번째 파일의 명시된 사주 계산 규칙을 JS로 옮긴 앱 레이어
+   - 일주: JDN + 49
+   - 시주: 오자식
+   - 십신 / 지장간 / 십이운성 / 공망 / 육합·충·해·파 / 삼합·방합
+   - 대운: year-stem + sex + 3일=1년 정책
+   - 주의: 두번째 파일은 실행 코드가 아니라 규격서이며,
+     1800~2300 절기/음력 원본 데이터가 첨부되어 있지 않음.
+     따라서 이 SPA는 절기 경계용 한국 기준일 fallback을 사용한다.
+     절기 경계일 출생자의 정밀 만세력은 frozen solar-term dataset
+     연결 후 같은 엔진 함수에 데이터만 주입하면 된다.
+   ============================================================ */
+
+const SAJU_STEMS = [
+  {hanja:'甲', ko:'갑', element:'목', polarity:'양'},
+  {hanja:'乙', ko:'을', element:'목', polarity:'음'},
+  {hanja:'丙', ko:'병', element:'화', polarity:'양'},
+  {hanja:'丁', ko:'정', element:'화', polarity:'음'},
+  {hanja:'戊', ko:'무', element:'토', polarity:'양'},
+  {hanja:'己', ko:'기', element:'토', polarity:'음'},
+  {hanja:'庚', ko:'경', element:'금', polarity:'양'},
+  {hanja:'辛', ko:'신', element:'금', polarity:'음'},
+  {hanja:'壬', ko:'임', element:'수', polarity:'양'},
+  {hanja:'癸', ko:'계', element:'수', polarity:'음'}
+];
+
+const SAJU_BRANCHES = [
+  {hanja:'子', ko:'자', element:'수', polarity:'양', animal:'쥐'},
+  {hanja:'丑', ko:'축', element:'토', polarity:'음', animal:'소'},
+  {hanja:'寅', ko:'인', element:'목', polarity:'양', animal:'호랑이'},
+  {hanja:'卯', ko:'묘', element:'목', polarity:'음', animal:'토끼'},
+  {hanja:'辰', ko:'진', element:'토', polarity:'양', animal:'용'},
+  {hanja:'巳', ko:'사', element:'화', polarity:'음', animal:'뱀'},
+  {hanja:'午', ko:'오', element:'화', polarity:'양', animal:'말'},
+  {hanja:'未', ko:'미', element:'토', polarity:'음', animal:'양'},
+  {hanja:'申', ko:'신', element:'금', polarity:'양', animal:'원숭이'},
+  {hanja:'酉', ko:'유', element:'금', polarity:'음', animal:'닭'},
+  {hanja:'戌', ko:'술', element:'토', polarity:'양', animal:'개'},
+  {hanja:'亥', ko:'해', element:'수', polarity:'음', animal:'돼지'}
+];
+
+const SAJU_HIDDEN = {
+  0:[8], 1:[5,7,9], 2:[0,2,4], 3:[1], 4:[4,1,9], 5:[2,6,4],
+  6:[3,5], 7:[5,3,1], 8:[6,8,4], 9:[7], 10:[4,7,3], 11:[8,0]
 };
 
+const SAJU_HIDDEN_ROLE = ['정기','중기','여기'];
+const SAJU_ELEMENTS = ['목','화','토','금','수'];
+const SAJU_STAGE_NAMES = ['장생','목욕','관대','건록','제왕','쇠','병','사','묘','절','태','양'];
+
+const SAJU_STAGE_START = {
+  0:{branch:11, dir:1}, 1:{branch:6, dir:-1}, 2:{branch:2, dir:1},
+  3:{branch:9, dir:-1}, 4:{branch:2, dir:1}, 5:{branch:9, dir:-1},
+  6:{branch:5, dir:1}, 7:{branch:0, dir:-1}, 8:{branch:8, dir:1},
+  9:{branch:3, dir:-1}
+};
+
+const SAJU_GEONROK = {0:2,1:3,2:5,3:6,4:5,5:6,6:8,7:9,8:11,9:0};
+const SAJU_YANGIN = {0:3,2:6,4:6,6:9,8:0};
+const SAJU_VOID = [[10,11],[8,9],[6,7],[4,5],[2,3],[0,1]];
+
+const SAJU_NAYIN = [
+  '해중금','해중금','노중화','노중화','대림목','대림목','노방토','노방토',
+  '검봉금','검봉금','산두화','산두화','간하수','간하수','성두토','성두토',
+  '백랍금','백랍금','양류목','양류목','천중수','천중수','옥상토','옥상토',
+  '벽력화','벽력화','송백목','송백목','장류수','장류수','사중금','사중금',
+  '산하화','산하화','평지목','평지목','벽상토','벽상토','금박금','금박금',
+  '복등화','복등화','천하수','천하수','대역토','대역토','차천금','차천금',
+  '상자목','상자목','대계수','대계수','사중토','사중토','천상화','천상화',
+  '석류목','석류목','대해수','대해수'
+];
+
+const SAJU_JIE = [
+  {month:1, day:6, name:'소한', ordinal:11, branch:1},
+  {month:2, day:4, name:'입춘', ordinal:0, branch:2},
+  {month:3, day:6, name:'경칩', ordinal:1, branch:3},
+  {month:4, day:5, name:'청명', ordinal:2, branch:4},
+  {month:5, day:6, name:'입하', ordinal:3, branch:5},
+  {month:6, day:6, name:'망종', ordinal:4, branch:6},
+  {month:7, day:7, name:'소서', ordinal:5, branch:7},
+  {month:8, day:7, name:'입추', ordinal:6, branch:8},
+  {month:9, day:8, name:'백로', ordinal:7, branch:9},
+  {month:10, day:8, name:'한로', ordinal:8, branch:10},
+  {month:11, day:7, name:'입동', ordinal:9, branch:11},
+  {month:12, day:7, name:'대설', ordinal:10, branch:0}
+];
+
+const SAJU_RELATIONS = {
+  stemCombine:[[0,5,'갑기합','토'],[1,6,'을경합','금'],[2,7,'병신합','수'],[3,8,'정임합','목'],[4,9,'무계합','화']],
+  stemClash:[[0,6,'갑경충'],[1,7,'을신충'],[2,8,'병임충'],[3,9,'정계충']],
+  branchCombine:[[0,1,'자축합'],[2,11,'인해합'],[3,10,'묘술합'],[4,9,'진유합'],[5,8,'사신합'],[6,7,'오미합']],
+  branchClash:[[0,6,'자오충'],[1,7,'축미충'],[2,8,'인신충'],[3,9,'묘유충'],[4,10,'진술충'],[5,11,'사해충']],
+  branchHarm:[[0,7,'자미해'],[1,6,'축오해'],[2,5,'인사해'],[3,4,'묘진해'],[8,11,'신해해'],[9,10,'유술해']],
+  branchBreak:[[0,9,'자유파'],[1,4,'축진파'],[2,11,'인해파'],[3,6,'묘오파'],[5,8,'사신파'],[7,10,'미술파']],
+  branchWonjin:[[0,7,'자미원진'],[1,6,'축오원진'],[2,9,'인유원진'],[3,8,'묘신원진'],[4,11,'진해원진'],[5,10,'사술원진']]
+};
+
+const SAJU_TRIPLES = [
+  {members:[8,0,4], element:'수', center:0, name:'신자진'},
+  {members:[11,3,7], element:'목', center:3, name:'해묘미'},
+  {members:[2,6,10], element:'화', center:6, name:'인오술'},
+  {members:[5,9,1], element:'금', center:9, name:'사유축'}
+];
+const SAJU_DIRECTIONAL = [
+  {members:[2,3,4], element:'목', name:'인묘진'},
+  {members:[5,6,7], element:'화', name:'사오미'},
+  {members:[8,9,10], element:'금', name:'신유술'},
+  {members:[11,0,1], element:'수', name:'해자축'}
+];
+
+const SAJU_PUNISHMENTS = [
+  {members:[2,5,8], name:'무은지형'},
+  {members:[1,10,7], name:'지세지형'},
+  {members:[0,3], name:'무례지형'}
+];
+
+const SAJU_TEN_GODS = [
+  ['비견','겁재'],['식신','상관'],['편재','정재'],['편관','정관'],['편인','정인']
+];
+
+function pmod(x,n){ return ((x % n) + n) % n; }
+
+function sajuJdn(y,m,d){
+  const a = Math.floor((14-m)/12);
+  const yy = y + 4800 - a;
+  const mm = m + 12*a - 3;
+  return d + Math.floor((153*mm+2)/5) + 365*yy + Math.floor(yy/4) - Math.floor(yy/100) + Math.floor(yy/400) - 32045;
+}
+
+function sajuCycleIndex(stemIndex, branchIndex){
+  const found = [];
+  for(let i=0;i<60;i++){
+    if(i%10===stemIndex && i%12===branchIndex) found.push(i);
+  }
+  return found.length===1 ? found[0] : null;
+}
+
+function sajuPillar(i){
+  if(i==null) return null;
+  return {
+    index:i,
+    stemIndex:i%10,
+    branchIndex:i%12,
+    stem:SAJU_STEMS[i%10],
+    branch:SAJU_BRANCHES[i%12],
+    text:SAJU_STEMS[i%10].hanja+SAJU_BRANCHES[i%12].hanja,
+    ko:SAJU_STEMS[i%10].ko+SAJU_BRANCHES[i%12].ko
+  };
+}
+
+function sajuParseDate(dateStr){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  return {y,m,d};
+}
+
+function sajuCompareDate(a,b){
+  const ka = a.y*10000+a.m*100+a.d, kb=b.y*10000+b.m*100+b.d;
+  return ka-kb;
+}
+
+function sajuApproxJieForDate(dateStr){
+  const {y,m,d}=sajuParseDate(dateStr);
+  let prev = null, next = null;
+  // 소한은 해당 연도 1월, 나머지는 해당 연도 2~12월.
+  for(const x of SAJU_JIE){
+    const yy = y;
+    const key = yy*10000+x.month*100+x.day;
+    const curKey = y*10000+m*100+d;
+    if(key <= curKey) prev = { ...x, y:yy };
+    if(key > curKey && !next) next = { ...x, y:yy };
+  }
+  if(!prev) prev = {...SAJU_JIE[0], y:y-1, month:1};
+  if(!next) next = {...SAJU_JIE[0], y:y+1, month:1};
+  return {previousJie:prev, nextJie:next};
+}
+
+function sajuYearPillar(dateStr){
+  const {y,m,d}=sajuParseDate(dateStr);
+  const sajuYear = (m>2 || (m===2 && d>=4)) ? y : y-1;
+  return sajuPillar(pmod(sajuYear-4,60));
+}
+
+function sajuMonthPillar(dateStr, yearPillar){
+  const {previousJie}=sajuApproxJieForDate(dateStr);
+  const ordinal = previousJie.ordinal;
+  const stemIndex = pmod(2*yearPillar.stemIndex + ordinal + 2, 10);
+  const branchIndex = pmod(ordinal+2,12);
+  return {
+    ...sajuPillar(sajuCycleIndex(stemIndex,branchIndex)),
+    jie:previousJie.name,
+    jieDate:`${previousJie.y}-${pad2(previousJie.month)}-${pad2(previousJie.day)}`
+  };
+}
+
+function sajuCorrectedTime(birthTime){
+  if(!birthTime) return null;
+  const parts=birthTime.split(':').map(Number);
+  const h=parts[0]||0, min=parts[1]||0, sec=parts[2]||0;
+  // 두번째 사양의 Korea compatibility mode: -30분
+  const rawSeconds=h*3600+min*60+sec-1800;
+  const dayShift=Math.floor(rawSeconds/86400);
+  const normalized=pmod(rawSeconds,86400);
+  return {
+    dayShift,
+    h:Math.floor(normalized/3600),
+    m:Math.floor((normalized%3600)/60),
+    s:normalized%60
+  };
+}
+
+function sajuHourBranch(corrected){
+  if(!corrected) return null;
+  const minutes=corrected.h*60+corrected.m+corrected.s/60;
+  return Math.floor(((minutes+60)%1440)/120);
+}
+
+function sajuDayPillar(dateStr, dayShift=0){
+  const {y,m,d}=sajuParseDate(dateStr);
+  const base = new Date(y,m-1,d);
+  base.setDate(base.getDate()+dayShift);
+  const j=sajuJdn(base.getFullYear(),base.getMonth()+1,base.getDate());
+  return sajuPillar(pmod(j+49,60));
+}
+
+function sajuHourPillar(dateStr,birthTime,dayPillar){
+  const corrected=sajuCorrectedTime(birthTime);
+  if(!corrected || !dayPillar) return null;
+  const hb=sajuHourBranch(corrected);
+  const effectiveHourDayStemIndex=dayPillar.stemIndex;
+  const hs=pmod(2*effectiveHourDayStemIndex+hb,10);
+  return sajuPillar(sajuCycleIndex(hs,hb));
+}
+
+function sajuHidden(branchIndex){
+  return (SAJU_HIDDEN[branchIndex]||[]).map((stemIndex,i)=>({
+    stemIndex,
+    stem:SAJU_STEMS[stemIndex],
+    role:SAJU_HIDDEN_ROLE[i] || `지장간${i+1}`
+  }));
+}
+
+function sajuTenGod(dayStemIndex,targetStemIndex){
+  const D=SAJU_STEMS[dayStemIndex], T=SAJU_STEMS[targetStemIndex];
+  const relation=pmod(SAJU_ELEMENTS.indexOf(T.element)-SAJU_ELEMENTS.indexOf(D.element),5);
+  if(relation===0) return D.polarity===T.polarity ? '비견':'겁재';
+  if(relation===1) return D.polarity===T.polarity ? '식신':'상관';
+  if(relation===2) return D.polarity===T.polarity ? '편재':'정재';
+  if(relation===3) return D.polarity===T.polarity ? '편관':'정관';
+  return D.polarity===T.polarity ? '편인':'정인';
+}
+
+function sajuStage(dayStemIndex,branchIndex){
+  const cfg=SAJU_STAGE_START[dayStemIndex];
+  if(!cfg) return null;
+  const idx=cfg.dir===1 ? pmod(branchIndex-cfg.branch,12) : pmod(cfg.branch-branchIndex,12);
+  return {index:idx,name:SAJU_STAGE_NAMES[idx]};
+}
+
+function sajuVoid(cycleIndex){
+  return SAJU_VOID[Math.floor(cycleIndex/10)] || null;
+}
+
+function sajuStemRelations(stems){
+  const out=[];
+  const pairs=SAJU_RELATIONS.stemCombine;
+  const clashes=SAJU_RELATIONS.stemClash;
+  for(let i=0;i<stems.length;i++) for(let j=i+1;j<stems.length;j++){
+    const a=stems[i], b=stems[j];
+    const hit=pairs.find(x=>(x[0]===a.stemIndex&&x[1]===b.stemIndex)||(x[0]===b.stemIndex&&x[1]===a.stemIndex));
+    if(hit) out.push({type:'합',name:hit[2],element:hit[3],a:a.position,b:b.position,status:'pair_present'});
+    const ch=clashes.find(x=>(x[0]===a.stemIndex&&x[1]===b.stemIndex)||(x[0]===b.stemIndex&&x[1]===a.stemIndex));
+    if(ch) out.push({type:'충',name:ch[2],a:a.position,b:b.position,status:'pair_present'});
+  }
+  return out;
+}
+
+function sajuBranchRelations(branches){
+  const out=[];
+  const groups=[
+    ['육합',SAJU_RELATIONS.branchCombine],
+    ['충',SAJU_RELATIONS.branchClash],
+    ['해',SAJU_RELATIONS.branchHarm],
+    ['파',SAJU_RELATIONS.branchBreak],
+    ['원진',SAJU_RELATIONS.branchWonjin]
+  ];
+  for(const [type,table] of groups){
+    for(let i=0;i<branches.length;i++) for(let j=i+1;j<branches.length;j++){
+      const a=branches[i],b=branches[j];
+      const hit=table.find(x=>(x[0]===a.branchIndex&&x[1]===b.branchIndex)||(x[0]===b.branchIndex&&x[1]===a.branchIndex));
+      if(hit) out.push({type,name:hit[2],a:a.position,b:b.position});
+    }
+  }
+  // 자형/진진/오오/유유/해해
+  const selfNames={0:'자자',2:'인인',4:'진진',5:'오오',9:'유유',10:'술술',11:'해해'};
+  for(const b of branches){
+    const count=branches.filter(x=>x.branchIndex===b.branchIndex).length;
+    if(count>=2 && selfNames[b.branchIndex]) out.push({type:'형',name:`${selfNames[b.branchIndex]} 자형`,a:b.position,b:'중복'});
+  }
+  // 삼합 / 방합
+  for(const g of SAJU_TRIPLES){
+    const hits=branches.filter(b=>g.members.includes(b.branchIndex));
+    const unique=[...new Set(hits.map(x=>x.branchIndex))];
+    if(unique.length>=2) out.push({type:'삼합',name:g.name,element:g.element,status:unique.length===3?'complete':'partial',centerIncluded:unique.includes(g.center)});
+  }
+  for(const g of SAJU_DIRECTIONAL){
+    const hits=branches.filter(b=>g.members.includes(b.branchIndex));
+    const unique=[...new Set(hits.map(x=>x.branchIndex))];
+    if(unique.length>=2) out.push({type:'방합',name:g.name,element:g.element,status:unique.length===3?'complete':'partial'});
+  }
+  return out;
+}
+
+function sajuElementCounts(pillars){
+  const visible={목:0,화:0,토:0,금:0,수:0};
+  const hidden={목:0,화:0,토:0,금:0,수:0};
+  pillars.forEach(p=>{
+    if(!p) return;
+    visible[p.stem.element]++;
+    visible[p.branch.element]++;
+    sajuHidden(p.branchIndex).forEach(h=>hidden[h.stem.element]++);
+  });
+  const combined={...visible};
+  Object.keys(hidden).forEach(k=>combined[k]+=hidden[k]);
+  return {visible,hidden,combined};
+}
+
+function sajuRoots(pillars){
+  const roots={};
+  pillars.forEach(p=>{
+    if(!p) return;
+    const exact=[], same=[];
+    SAJU_HIDDEN[p.branchIndex].forEach((stemIndex,i)=>{
+      if(stemIndex===p.stemIndex) exact.push({position:p.position,role:SAJU_HIDDEN_ROLE[i]||`지장간${i+1}`});
+      if(SAJU_STEMS[stemIndex].element===p.stem.element) same.push({position:p.position,role:SAJU_HIDDEN_ROLE[i]||`지장간${i+1}`});
+    });
+    roots[p.position]={exact,same};
+  });
+  return roots;
+}
+
+function sajuApproxIntervalDays(birthDate, refDate){
+  const a=sajuParseDate(birthDate), b=sajuParseDate(refDate);
+  const da=new Date(a.y,a.m-1,a.d), db=new Date(b.y,b.m-1,b.d);
+  return Math.abs(Math.round((db-da)/86400000));
+}
+
+function sajuDaewoon(birthDate, birthTime, sex, monthPillar, yearPillar, dayStemIndex){
+  if(!monthPillar || !yearPillar) return null;
+  const forward = (sex==='male')
+    ? (yearPillar.stem.polarity==='양')
+    : (yearPillar.stem.polarity==='음');
+  const jie=sajuApproxJieForDate(birthDate);
+  const reference=forward ? jie.nextJie : jie.previousJie;
+  const referenceDate=`${reference.y}-${pad2(reference.month)}-${pad2(reference.day)}`;
+  const intervalDays=sajuApproxIntervalDays(birthDate,referenceDate);
+  const startAgeYears=intervalDays/3;
+  const direction=forward?1:-1;
+  const list=[];
+  for(let n=1;n<=12;n++){
+    const idx=pmod(monthPillar.index+direction*n,60);
+    const pillar=sajuPillar(idx);
+    list.push({
+      n,pillar,startAge:startAgeYears+10*(n-1),endAge:startAgeYears+10*n,
+      tenGodStem:sajuTenGod(dayStemIndex,pillar.stemIndex),
+      stage:sajuStage(yearPillar.stemIndex,pillar.branchIndex)
+    });
+  }
+  return {direction:forward?'순행':'역행',directionSign:direction,reference,referenceDate,intervalDays,startAgeYears,list};
+}
+
+function sajuCurrentDaewoon(daewoon, todayYear, birthYear){
+  if(!daewoon) return null;
+  const age=todayYear-birthYear;
+  return daewoon.list.find(d=>age>=d.startAge && age<d.endAge) || null;
+}
+
+function sajuTransit(dateStr,timeStr){
+  const yp=sajuYearPillar(dateStr);
+  const mp=sajuMonthPillar(dateStr,yp);
+  const corrected=sajuCorrectedTime(timeStr||'12:00');
+  const dayShift=corrected ? corrected.dayShift : 0;
+  const dp=sajuDayPillar(dateStr,dayShift);
+  const hp=timeStr ? sajuHourPillar(dateStr,timeStr,dp) : null;
+  return {year:yp,month:mp,day:dp,hour:hp,corrected};
+}
+
 function simpleHash(str){
-  let hash = 0;
-  for(let i=0;i<str.length;i++){ hash = (hash*31 + str.charCodeAt(i)) >>> 0; }
-  return hash;
+  // Deterministic 32-bit hash for stable UI scoring.
+  let h = 2166136261;
+  for(let i=0;i<str.length;i++){
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0);
+}
+
+function calculateSajuFortune(gender,birthDate,birthTime,targetDate=todayStr()){
+  if(!birthDate) return null;
+  const year=sajuYearPillar(birthDate);
+  const month=sajuMonthPillar(birthDate,year);
+  const corrected=sajuCorrectedTime(birthTime);
+  const jasiShift = corrected && (corrected.h >= 23) ? 1 : 0;
+  const day=sajuDayPillar(birthDate,(corrected ? corrected.dayShift : 0) + jasiShift);
+  const hour=birthTime ? sajuHourPillar(birthDate,birthTime,day) : null;
+
+  const natal=[
+    {...year,position:'년주'},
+    {...month,position:'월주'},
+    {...day,position:'일주'},
+    ...(hour ? [{...hour,position:'시주'}] : [])
+  ];
+  const targetTime = targetDate===todayStr() ? `${pad2(new Date().getHours())}:${pad2(new Date().getMinutes())}:${pad2(new Date().getSeconds())}` : '12:00:00';
+  const transit=sajuTransit(targetDate,targetTime);
+  const transitPillars=[
+    {...transit.year,position:'세운'},
+    {...transit.month,position:'월운'},
+    {...transit.day,position:'일운'},
+    ...(transit.hour ? [{...transit.hour,position:'시운'}] : [])
+  ];
+
+  const dayMaster=SAJU_STEMS[day.stemIndex];
+  const natalStems=natal.map(p=>({stemIndex:p.stemIndex,position:p.position}));
+  const natalBranches=natal.map(p=>({branchIndex:p.branchIndex,position:p.position}));
+  const transitBranches=transitPillars.map(p=>({branchIndex:p.branchIndex,position:p.position}));
+  const allStems=[...natalStems,...transitPillars.map(p=>({stemIndex:p.stemIndex,position:p.position}))];
+
+  const elementCounts=sajuElementCounts(natal);
+  const daewoon=sajuDaewoon(birthDate,birthTime,gender,month,year,day.stemIndex);
+  const by=Number(birthDate.slice(0,4)), ty=Number(targetDate.slice(0,4));
+  const currentDaewoon=sajuCurrentDaewoon(daewoon,ty,by);
+
+  const dailyStemGod=sajuTenGod(day.stemIndex,transit.day.stemIndex);
+  const dailyStage=sajuStage(day.stemIndex,transit.day.branchIndex);
+  const dailyVoid=sajuVoid(transit.day.index);
+  const dailyBranchRelations=sajuBranchRelations([...natalBranches,...transitBranches])
+    .filter(x=>x.a==='일운'||x.b==='일운'||x.a==='년주'||x.b==='년주'||x.a==='월주'||x.b==='월주'||x.a==='일주'||x.b==='일주'||x.a==='시주'||x.b==='시주');
+  const allRelations=sajuBranchRelations(natalBranches);
+  const allStemRelations=sajuStemRelations(natalStems);
+  const hiddenGods={};
+  natal.forEach(p=>hiddenGods[p.position]=sajuHidden(p.branchIndex).map(h=>({...h,tenGod:sajuTenGod(day.stemIndex,h.stemIndex)})));
+
+  const visibleTenGods=natal.map(p=>({
+    position:p.position,
+    tenGod:p.position==='일주'?'일간':sajuTenGod(day.stemIndex,p.stemIndex)
+  }));
+  const transitTenGods=transitPillars.map(p=>({position:p.position,tenGod:sajuTenGod(day.stemIndex,p.stemIndex)}));
+
+  // 앱 표시용 운세 콘텐츠: 핵심 계산값에 별도의 규칙 기반 문장 레이어를 적용한다.
+  const relationHit=dailyBranchRelations.find(x=>x.a==='일운'||x.b==='일운');
+  const dailyElement=transit.day.stem.element;
+  const scoreSeed = simpleHash(`${gender}|${birthDate}|${birthTime||''}|${targetDate}|${day.index}|${transit.day.index}`);
+  let score=55;
+  const godScore={비견:3,겁재:-1,식신:7,상관:2,편재:6,정재:8,편관:-3,정관:5,편인:4,정인:7};
+  score += godScore[dailyStemGod]||0;
+  if(relationHit){
+    if(relationHit.type==='육합') score+=8;
+    if(relationHit.type==='삼합') score+=5;
+    if(relationHit.type==='충') score-=9;
+    if(relationHit.type==='해') score-=4;
+    if(relationHit.type==='파') score-=3;
+    if(relationHit.type==='형') score-=4;
+  }
+  score += (scoreSeed%7)-3;
+  score=Math.max(35,Math.min(96,score));
+  const tier=score>=85?'great':score>=70?'good':score>=52?'normal':score>=43?'tough':'hard';
+
+  const fortuneByGod={
+    비견:'내 페이스를 지키는 것이 중요한 날이에요. 혼자 결정하기보다 필요한 부분은 주변과 나눠보세요.',
+    겁재:'경쟁이나 비교에 마음이 흔들리기 쉬워요. 오늘은 내 기준을 먼저 세우는 편이 좋아요.',
+    식신:'차분하게 실력을 꺼내 쓰기 좋은 흐름이에요. 작은 결과를 하나씩 완성해보세요.',
+    상관:'표현력이 살아나는 날이에요. 다만 말의 속도보다 상대가 받아들이는 속도를 살펴보세요.',
+    편재:'사람과 정보가 움직이는 날이에요. 새로운 제안이나 작은 기회를 가볍게 살펴보세요.',
+    정재:'계획과 정리가 힘을 발휘해요. 미뤄둔 실무나 돈과 관련된 정리를 하기 좋아요.',
+    편관:'해야 할 일이 선명해지는 대신 압박도 커질 수 있어요. 우선순위를 좁혀서 움직여보세요.',
+    정관:'규칙과 책임을 지키는 태도가 돋보여요. 약속과 마감처럼 기본적인 것을 챙기면 좋아요.',
+    편인:'새로운 관점이 들어오는 날이에요. 혼자 생각을 정리하는 시간이 도움이 될 수 있어요.',
+    정인:'배우고 정리하는 힘이 좋은 날이에요. 이미 알고 있는 것을 다시 다듬어보세요.'
+  };
+
+  const relationText = relationHit
+    ? `${relationHit.name} 관계가 오늘의 일운과 연결되어 있어요.`
+    : '오늘은 원국의 관계보다 일운 자체의 기운을 차분히 살펴보는 편이 좋아요.';
+
+  const interpretation=[
+    fortuneByGod[dailyStemGod],
+    relationText,
+    `오늘의 일운은 ${SAJU_ELEMENTS.indexOf(dailyElement)>=0?dailyElement:''} 기운의 천간 ${transit.day.stem.ko}이 들어오는 날이에요.`,
+    `일운의 십이운성은 ${dailyStage ? dailyStage.name : '확인 불가'}으로 표시돼요.`
+  ];
+
+  return {
+    engineVersion:'our-archive-saju-ui-v1',
+    policyVersion:'year_stem_sex_jie_3days_1year_v1',
+    calendarMode:'solar',
+    solarTermMode:'korean_jie_fallback_v1',
+    targetDate,
+    gender,birthDate,birthTime:birthTime||null,
+    natal,natalText:natal.map(p=>p.text).join(' '),
+    nayin:natal.map(p=>({position:p.position,text:p.text,name:SAJU_NAYIN[p.index]||'-'})),
+    dayMaster,
+    zodiac:year.branch.animal,
+    elementCounts,
+    visibleTenGods,transitTenGods,hiddenGods,
+    stemRelations:allStemRelations,
+    branchRelations:allRelations,
+    roots:sajuRoots(natal),
+    daily:{pillar:transit.day,tenGod:dailyStemGod,stage:dailyStage,void:dailyVoid,relations:dailyBranchRelations},
+    transit:transitPillars,
+    daewoon,currentDaewoon,
+    score,tier,interpretation
+  };
+}
+
+const FORTUNE_TIER_LABEL = { great:'아주 좋음', good:'좋음', normal:'무난함', tough:'주의', hard:'천천히' };
+const FORTUNE_TIER_COLOR = { great:'var(--accent-yellow)', good:'var(--accent-blue)', normal:'var(--accent-gray)', tough:'var(--accent-purple)', hard:'var(--accent-red)' };
+
+function pillarMiniHtml(p){
+  if(!p) return '';
+  return `
+    <div class="text-center rounded-2xl p-3" style="background:var(--bg-soft);">
+      <p class="text-[11px] mb-1" style="color:var(--text-muted)">${p.position||''}</p>
+      <p class="font-hand text-2xl" style="color:var(--text)">${p.text}</p>
+      <p class="text-[11px] mt-1" style="color:var(--text-muted)">${p.ko}</p>
+    </div>`;
+}
+
+function sajuInterpretationHtml(r, compact=false){
+  if(!r) return '';
+  const relation=r.daily.relations && r.daily.relations[0];
+  const relationLabel=relation ? `${relation.name}` : '특별한 관계 없음';
+  const current=r.currentDaewoon ? `${r.currentDaewoon.pillar.ko} 대운` : '현재 대운 계산 범위 밖';
+  return `
+    <div class="fade-in">
+      <div class="flex items-center justify-between gap-3 mb-3">
+        <div>
+          <p class="text-xs" style="color:var(--text-muted)">오늘의 사주 흐름 · ${escapeHtml(r.targetDate)}</p>
+          <p class="font-hand text-2xl mt-1" style="color:var(--text)">${r.score}점 · ${FORTUNE_TIER_LABEL[r.tier]}</p>
+        </div>
+        <span class="text-2xl">🔮</span>
+      </div>
+      <div class="bar-track h-2 mb-4"><div class="bar-fill" style="width:${r.score}%; background:${FORTUNE_TIER_COLOR[r.tier]};"></div></div>
+
+      <div class="grid grid-cols-4 gap-2 mb-4">${r.natal.map(pillarMiniHtml).join('')}</div>
+
+      <div class="grid sm:grid-cols-2 gap-3 mb-4">
+        <div class="rounded-2xl p-4" style="background:#f7edf1;">
+          <p class="text-xs mb-1" style="color:var(--text-muted)">나의 일간</p>
+          <p class="font-hand text-xl" style="color:var(--text)">${r.dayMaster.hanja} ${r.dayMaster.ko} · ${r.dayMaster.element} ${r.dayMaster.polarity}</p>
+          <p class="text-xs mt-1" style="color:var(--text-muted)">띠 ${r.zodiac} · 현재 ${escapeHtml(current)}</p>
+        </div>
+        <div class="rounded-2xl p-4" style="background:var(--bg-soft);">
+          <p class="text-xs mb-1" style="color:var(--text-muted)">오늘의 일운</p>
+          <p class="font-hand text-xl" style="color:var(--text)">${r.daily.pillar.text} ${r.daily.pillar.ko}</p>
+          <p class="text-xs mt-1" style="color:var(--text-muted)">십신 ${r.daily.tenGod} · 십이운성 ${r.daily.stage?r.daily.stage.name:'-'}</p>
+        </div>
+      </div>
+
+      <div class="space-y-2 mb-4">
+        ${r.interpretation.slice(0,compact?2:4).map((x,i)=>`
+          <p class="text-sm leading-7" style="color:var(--text);">
+            <span class="font-semibold">${i===0?'오늘의 핵심':'•'}</span> ${escapeHtml(x)}
+          </p>`).join('')}
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-2 mb-4">
+        <div class="chip justify-center">오늘의 십신 · ${r.daily.tenGod}</div>
+        <div class="chip justify-center">일운 관계 · ${escapeHtml(relationLabel)}</div>
+      </div>
+
+      ${compact ? `
+        <button id="open-saju-detail" type="button" class="btn-ghost w-full text-sm">사주팔자와 대운 자세히 보기 →</button>
+      ` : `
+        <div class="stitch my-5"></div>
+        <h3 class="font-hand text-lg mb-3" style="color:var(--text)">대운</h3>
+        ${r.daewoon ? `
+          <p class="text-xs mb-3" style="color:var(--text-muted)">
+            ${r.daewoon.direction} · 기준 절기 ${escapeHtml(r.daewoon.reference.name)} · 시작 ${r.daewoon.startAgeYears.toFixed(2)}세
+          </p>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            ${r.daewoon.list.slice(0,8).map(d=>`
+              <div class="rounded-2xl p-3 ${r.currentDaewoon&&r.currentDaewoon.n===d.n?'ring-2':''}" style="background:${r.currentDaewoon&&r.currentDaewoon.n===d.n?'#f7edf1':'var(--bg-soft)'};">
+                <p class="text-[10px]" style="color:var(--text-muted)">${d.n}대운 · ${d.startAge.toFixed(1)}–${d.endAge.toFixed(1)}세</p>
+                <p class="font-hand text-xl mt-1" style="color:var(--text)">${d.pillar.text}</p>
+                <p class="text-[11px]" style="color:var(--text-muted)">${sajuTenGod(r.natal.find(x=>x.position==='일주').stemIndex,d.pillar.stemIndex)}</p>
+              </div>`).join('')}
+          </div>
+        ` : `<p class="text-sm" style="color:var(--text-muted)">대운 계산에 필요한 정보가 부족해요.</p>`}
+
+        <div class="stitch my-5"></div>
+        <h3 class="font-hand text-lg mb-3" style="color:var(--text)">지장간 · 공망 · 납음</h3>
+        <div class="grid sm:grid-cols-3 gap-3 mb-4">
+          <div class="rounded-2xl p-4" style="background:var(--bg-soft);">
+            <p class="text-xs mb-2" style="color:var(--text-muted)">지장간</p>
+            ${Object.entries(r.hiddenGods).map(([pos,arr])=>`
+              <div class="text-xs py-1 flex justify-between gap-2">
+                <span>${pos}</span><span>${arr.map(h=>`${h.stem.ko}(${h.tenGod})`).join(' · ')}</span>
+              </div>`).join('')}
+          </div>
+          <div class="rounded-2xl p-4" style="background:var(--bg-soft);">
+            <p class="text-xs mb-2" style="color:var(--text-muted)">일주 공망</p>
+            <p class="font-hand text-xl" style="color:var(--text)">${r.daily.void ? r.daily.void.map(i=>SAJU_BRANCHES[i].ko).join(' · ') : '-'}</p>
+            <p class="text-[11px] mt-1" style="color:var(--text-muted)">일운 기준</p>
+          </div>
+          <div class="rounded-2xl p-4" style="background:var(--bg-soft);">
+            <p class="text-xs mb-2" style="color:var(--text-muted)">납음</p>
+            ${r.nayin.map(x=>`<div class="text-xs py-1 flex justify-between"><span>${x.position}</span><b>${x.name}</b></div>`).join('')}
+          </div>
+        </div>
+
+        <div class="stitch my-5"></div>
+        <h3 class="font-hand text-lg mb-3" style="color:var(--text)">오행 · 십신 · 관계</h3>
+        <div class="grid sm:grid-cols-3 gap-3">
+          <div class="rounded-2xl p-4" style="background:var(--bg-soft);">
+            <p class="text-xs mb-2" style="color:var(--text-muted)">오행 분포(원국 가중치 없음)</p>
+            ${Object.entries(r.elementCounts.visible).map(([k,v])=>`<div class="flex justify-between text-xs py-1"><span>${k}</span><b>${v}</b></div>`).join('')}
+          </div>
+          <div class="rounded-2xl p-4" style="background:var(--bg-soft);">
+            <p class="text-xs mb-2" style="color:var(--text-muted)">천간 십신</p>
+            ${r.visibleTenGods.map(x=>`<div class="flex justify-between text-xs py-1"><span>${x.position}</span><b>${x.tenGod}</b></div>`).join('')}
+          </div>
+          <div class="rounded-2xl p-4" style="background:var(--bg-soft);">
+            <p class="text-xs mb-2" style="color:var(--text-muted)">원국 지지 관계</p>
+            ${r.branchRelations.length ? r.branchRelations.slice(0,6).map(x=>`<div class="text-xs py-1">${x.type} · ${x.name}</div>`).join('') : '<div class="text-xs py-1" style="color:var(--text-muted)">표시할 관계 없음</div>'}
+          </div>
+        </div>
+        <p class="text-[11px] mt-4 leading-5" style="color:var(--text-muted)">
+          ※ 점수와 해석 문장은 사주 원국의 객관적 계산값과 별도로 앱에서 만든 엔터테인먼트용 규칙 레이어예요.
+          용신·희신·격국·신강/신약 등 학파별 판단은 이 화면에서 단정하지 않아요.
+        </p>
+      `}
+    </div>`;
 }
 
 function computeFortune(gender, birthDate, birthTime){
-  const key = `${gender}|${birthDate}|${birthTime||''}|${todayStr()}`;
-  const hash = simpleHash(key);
-  const score = hash % 101;
-  const tier = score>=85 ? 'great' : score>=65 ? 'good' : score>=40 ? 'normal' : score>=20 ? 'tough' : 'hard';
-  const pool = FORTUNE_LINES[tier];
-  const idx1 = hash % pool.length;
-  let idx2 = Math.floor(hash/7) % pool.length;
-  if(idx2 === idx1) idx2 = (idx2+1) % pool.length;
-  const lines = [pool[idx1], pool[idx2]];
-  if(hash % 5 === 0){
-    let idx3 = Math.floor(hash/13) % pool.length;
-    while(idx3===idx1 || idx3===idx2) idx3 = (idx3+1) % pool.length;
-    lines.push(pool[idx3]);
-  }
-  return { score, tier, lines };
+  return calculateSajuFortune(gender,birthDate,birthTime,todayStr());
 }
 
-const FORTUNE_TIER_LABEL = { great:'아주 좋음', good:'좋음', normal:'보통', tough:'주의', hard:'조심' };
-const FORTUNE_TIER_COLOR = { great:'var(--accent-yellow)', good:'var(--accent-blue)', normal:'var(--accent-gray)', tough:'var(--accent-purple)', hard:'var(--accent-red)' };
-
 function fortuneResultHtml(r){
-  return `
-    <div class="fade-in">
-      <div class="flex items-center justify-between mb-2">
-        <span class="font-hand text-2xl" style="color:var(--text)">${r.score}점</span>
-        <span class="text-xs px-3 py-1 rounded-full font-semibold" style="background:${FORTUNE_TIER_COLOR[r.tier]}; color:#233432;">${FORTUNE_TIER_LABEL[r.tier]}</span>
-      </div>
-      <div class="bar-track h-2 mb-4"><div class="bar-fill" style="width:${r.score}%; background:${FORTUNE_TIER_COLOR[r.tier]};"></div></div>
-      <p class="text-sm leading-7" style="color:var(--text);">${r.lines.map(l=>escapeHtml(l)).join('<br/>')}</p>
-    </div>`;
+  return sajuInterpretationHtml(r,true);
 }
 
 function moodOf(key){ return MOODS.find(m => m.key === key); }
@@ -912,6 +1463,7 @@ const NAV_ITEMS = [
   { key:'write',    label:'기록하기', icon:'✍️' },
   { key:'list',     label:'내 기록', icon:'📔' },
   { key:'calendar', label:'캘린더',   icon:'📅' },
+  { key:'fortune',  label:'사주·운세', icon:'🔮' },
   { key:'stats',    label:'통계',   icon:'📊' },
 ];
 
@@ -928,6 +1480,7 @@ function sidePanelsHtml(){
         <button type="button" data-side-nav="write" class="btn-ghost text-xs !py-2 text-left">✍️ 오늘 일기 쓰기</button>
         <button type="button" data-side-nav="stats" class="btn-ghost text-xs !py-2 text-left">📊 감정 통계 보기</button>
         <button type="button" data-side-nav="calendar" class="btn-ghost text-xs !py-2 text-left">📅 캘린더 보기</button>
+        <button type="button" data-side-nav="fortune" class="btn-ghost text-xs !py-2 text-left">🔮 사주·운세 보기</button>
       </div>
       <div class="double-divider my-4"></div>
       <div class="space-y-3">
@@ -1190,6 +1743,7 @@ function renderApp(){
   if(state.view === 'write') return renderWrite();
   if(state.view === 'list') return renderList();
   if(state.view === 'calendar') return renderCalendarPage();
+  if(state.view === 'fortune') return renderFortunePage();
   if(state.view === 'detail') return renderDetail();
   if(state.view === 'stats') return renderStats();
   renderHome();
@@ -1558,6 +2112,10 @@ function renderHome(){
   document.getElementById('cancel-fortune')?.addEventListener('click', () => {
     state.editingFortune = false;
     renderHome();
+  });
+
+  document.getElementById('open-saju-detail')?.addEventListener('click', () => {
+    nav('fortune');
   });
 
   document.getElementById('go-today-entry')?.addEventListener('click', () => nav('detail', { entryId: todayEntry.id }));
@@ -1993,6 +2551,77 @@ function entryCardHighlightHtml(e){
     </div>`;
 }
 
+/* ============================================================
+   사주 · 오늘의 운세
+   ============================================================ */
+function renderFortunePage(){
+  const fortuneInput=DB.getFortuneInput();
+  const result=fortuneInput ? computeFortune(fortuneInput.gender,fortuneInput.birthDate,fortuneInput.birthTime) : null;
+  const html=`
+    <section class="fade-in pb-10 max-w-4xl mx-auto">
+      <div class="flex items-end justify-between gap-3 mb-5">
+        <div>
+          <h1 class="font-hand text-3xl" style="color:var(--text)">사주 · 오늘의 운세</h1>
+          <p class="text-sm mt-1" style="color:var(--text-muted)">생년월일과 출생시간을 바탕으로 사주팔자와 오늘의 흐름을 함께 볼 수 있어요.</p>
+        </div>
+        ${result ? `<button id="fortune-page-edit" class="btn-ghost text-xs">정보 수정</button>` : ''}
+      </div>
+
+      ${(!result || state.editingFortune) ? `
+        <div class="paper-card p-5 sm:p-6 mb-5" style="background:#faf7ef;">
+          <h2 class="font-hand text-xl mb-3" style="color:var(--text)">나의 사주 정보</h2>
+          <form id="fortune-page-form" class="space-y-3">
+            <div class="grid sm:grid-cols-2 gap-2">
+              <select id="fp-gender" class="text-sm p-3 rounded-xl border" style="background:var(--bg-soft);border-color:var(--border);color:var(--text)" required>
+                <option value="">성별 선택</option>
+                <option value="female" ${fortuneInput&&fortuneInput.gender==='female'?'selected':''}>여성</option>
+                <option value="male" ${fortuneInput&&fortuneInput.gender==='male'?'selected':''}>남성</option>
+              </select>
+              <input id="fp-birthdate" type="date" value="${fortuneInput?escapeHtml(fortuneInput.birthDate):''}" class="text-sm p-3 rounded-xl border" style="background:var(--bg-soft);border-color:var(--border);color:var(--text)" required />
+            </div>
+            <input id="fp-birthtime" type="time" value="${fortuneInput?escapeHtml(fortuneInput.birthTime||''):''}" class="w-full text-sm p-3 rounded-xl border" style="background:var(--bg-soft);border-color:var(--border);color:var(--text)" />
+            <p class="text-xs leading-5" style="color:var(--text-muted)">출생시간을 모르면 비워둘 수 있어요. 다만 시주는 계산되지 않아요.</p>
+            <div class="flex justify-end gap-2">
+              ${state.editingFortune?`<button id="fortune-page-cancel" type="button" class="btn-ghost text-xs">취소</button>`:''}
+              <button class="btn-primary text-sm !py-2.5" type="submit">사주와 오늘의 운세 보기 🔮</button>
+            </div>
+          </form>
+        </div>
+      ` : `
+        <div class="paper-card p-5 sm:p-6" style="background:#faf7ef;">
+          ${sajuInterpretationHtml(result,false)}
+        </div>
+      `}
+
+      <div class="paper-card p-4 mt-5" style="background:#fffdf4;border:1px dashed var(--border);">
+        <p class="text-xs leading-5" style="color:var(--text-muted)">
+          계산 기준: 두번째 만세력 규격의 JDN 일주, 오자식 시주, 십신·지장간·십이운성·공망·관계·대운 규칙을 사용해요.
+          현재 첨부된 규격에는 실제 1800~2300 절기 원본 데이터가 포함되어 있지 않아 절기 경계는 앱 내 한국 기준일 fallback으로 계산합니다.
+          따라서 입춘·절기 경계 직전/직후 출생자는 정밀 절기 데이터 연결 후 결과가 달라질 수 있어요.
+        </p>
+      </div>
+    </section>`;
+  renderShell(html);
+
+  document.getElementById('fortune-page-form')?.addEventListener('submit',(e)=>{
+    e.preventDefault();
+    const gender=document.getElementById('fp-gender').value;
+    const birthDate=document.getElementById('fp-birthdate').value;
+    const birthTime=document.getElementById('fp-birthtime').value;
+    if(!gender||!birthDate) return;
+    DB.saveFortuneInput({gender,birthDate,birthTime});
+    state.editingFortune=false;
+    showToast('사주와 오늘의 운세를 계산했어요 🔮');
+    renderFortunePage();
+  });
+  document.getElementById('fortune-page-edit')?.addEventListener('click',()=>{
+    state.editingFortune=true; renderFortunePage();
+  });
+  document.getElementById('fortune-page-cancel')?.addEventListener('click',()=>{
+    state.editingFortune=false; renderFortunePage();
+  });
+}
+
 /* ---- 캘린더 페이지 ---- */
 function renderCalendarPage(){
   const html = `
@@ -2258,6 +2887,7 @@ document.addEventListener('keydown', (e) => {
   if(e.key === 'h' || e.key === 'H'){ nav('home'); }
   if(e.key === 'l' || e.key === 'L'){ nav('list'); }
   if(e.key === 'c' || e.key === 'C'){ nav('calendar'); }
+  if(e.key === 'f' || e.key === 'F'){ nav('fortune'); }
 });
 
 /* ---------------- 초기 실행 ---------------- */
