@@ -2003,31 +2003,53 @@ function wireTodoWidgets(){
     });
   });
 
-  // 항목 추가 (같은 날짜의 입력창이 화면에 여러 개 있을 수 있어서
-  // document 전체에서 찾지 않고, 버튼과 같은 부모 안에 있는 input만 사용)
-  function addTodoItemFromInput(input){
-    if(!input) return;
-    const date = input.getAttribute('data-todo-new');
-    const text = input.value.trim();
-    if(!date || !text) return;
-    const items = (state.todos[date] || []).slice();
-    items.push({ id:newId(), text, status:'progress' });
-    state.todos[date] = items;
-    input.value = '';
-    persistTodoList(date, items).then(() => renderApp());
-  }
-  document.querySelectorAll('[data-todo-add]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const date = btn.getAttribute('data-todo-add');
-      const input = btn.parentElement ? btn.parentElement.querySelector(`[data-todo-new="${date}"]`) : null;
+// 항목 추가
+function addTodoItemFromInput(input){
+  if(!input) return;
+
+  const date = input.getAttribute('data-todo-new');
+  const text = input.value.trim();
+
+  if(!date || !text) return;
+
+  const items = (state.todos[date] || []).slice();
+
+  items.push({
+    id: newId(),
+    text: text,
+    status: 'progress'
+  });
+
+  state.todos[date] = items;
+  input.value = '';
+
+  persistTodoList(date, items).then(() => renderApp());
+}
+
+// 추가 버튼
+document.querySelectorAll('[data-todo-add]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const date = btn.getAttribute('data-todo-add');
+
+    // 버튼이 들어있는 영역에서 해당 날짜의 입력창 찾기
+    const container = btn.closest('.todo-add-area');
+    const input = container
+      ? container.querySelector(`[data-todo-new="${date}"]`)
+      : document.querySelector(`[data-todo-new="${date}"]`);
+
+    addTodoItemFromInput(input);
+  });
+});
+
+// 입력창에서 Enter
+document.querySelectorAll('.todo-new-input').forEach(input => {
+  input.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){
+      e.preventDefault();
       addTodoItemFromInput(input);
-    });
+    }
   });
-  document.querySelectorAll('.todo-new-input').forEach(input => {
-    input.addEventListener('keydown', (e) => {
-      if(e.key === 'Enter'){ e.preventDefault(); addTodoItemFromInput(input); }
-    });
-  });
+});
 
 function renderHome(){
   clearInterval(state.quoteTimer);
