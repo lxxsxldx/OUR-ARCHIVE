@@ -2003,12 +2003,13 @@ function wireTodoWidgets(){
     });
   });
 
-  // 항목 추가
-  function addTodoItem(date){
-    const input = document.querySelector(`[data-todo-new="${date}"]`);
+  // 항목 추가 (같은 날짜의 입력창이 화면에 여러 개 있을 수 있어서
+  // document 전체에서 찾지 않고, 버튼과 같은 부모 안에 있는 input만 사용)
+  function addTodoItemFromInput(input){
     if(!input) return;
+    const date = input.getAttribute('data-todo-new');
     const text = input.value.trim();
-    if(!text) return;
+    if(!date || !text) return;
     const items = (state.todos[date] || []).slice();
     items.push({ id:newId(), text, status:'progress' });
     state.todos[date] = items;
@@ -2016,14 +2017,17 @@ function wireTodoWidgets(){
     persistTodoList(date, items).then(() => renderApp());
   }
   document.querySelectorAll('[data-todo-add]').forEach(btn => {
-    btn.addEventListener('click', () => addTodoItem(btn.getAttribute('data-todo-add')));
+    btn.addEventListener('click', () => {
+      const date = btn.getAttribute('data-todo-add');
+      const input = btn.parentElement ? btn.parentElement.querySelector(`[data-todo-new="${date}"]`) : null;
+      addTodoItemFromInput(input);
+    });
   });
   document.querySelectorAll('.todo-new-input').forEach(input => {
     input.addEventListener('keydown', (e) => {
-      if(e.key === 'Enter'){ e.preventDefault(); addTodoItem(input.getAttribute('data-todo-new')); }
+      if(e.key === 'Enter'){ e.preventDefault(); addTodoItemFromInput(input); }
     });
   });
-}
 
 function renderHome(){
   clearInterval(state.quoteTimer);
