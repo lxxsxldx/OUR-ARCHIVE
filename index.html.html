@@ -2003,53 +2003,27 @@ function wireTodoWidgets(){
     });
   });
 
-// 항목 추가
-function addTodoItemFromInput(input){
-  if(!input) return;
-
-  const date = input.getAttribute('data-todo-new');
-  const text = input.value.trim();
-
-  if(!date || !text) return;
-
-  const items = (state.todos[date] || []).slice();
-
-  items.push({
-    id: newId(),
-    text: text,
-    status: 'progress'
+  // 항목 추가
+  function addTodoItem(date){
+    const input = document.querySelector(`[data-todo-new="${date}"]`);
+    if(!input) return;
+    const text = input.value.trim();
+    if(!text) return;
+    const items = (state.todos[date] || []).slice();
+    items.push({ id:newId(), text, status:'progress' });
+    state.todos[date] = items;
+    input.value = '';
+    persistTodoList(date, items).then(() => renderApp());
+  }
+  document.querySelectorAll('[data-todo-add]').forEach(btn => {
+    btn.addEventListener('click', () => addTodoItem(btn.getAttribute('data-todo-add')));
   });
-
-  state.todos[date] = items;
-  input.value = '';
-
-  persistTodoList(date, items).then(() => renderApp());
+  document.querySelectorAll('.todo-new-input').forEach(input => {
+    input.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter'){ e.preventDefault(); addTodoItem(input.getAttribute('data-todo-new')); }
+    });
+  });
 }
-
-// 추가 버튼
-document.querySelectorAll('[data-todo-add]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const date = btn.getAttribute('data-todo-add');
-
-    // 버튼이 들어있는 영역에서 해당 날짜의 입력창 찾기
-    const container = btn.closest('.todo-add-area');
-    const input = container
-      ? container.querySelector(`[data-todo-new="${date}"]`)
-      : document.querySelector(`[data-todo-new="${date}"]`);
-
-    addTodoItemFromInput(input);
-  });
-});
-
-// 입력창에서 Enter
-document.querySelectorAll('.todo-new-input').forEach(input => {
-  input.addEventListener('keydown', (e) => {
-    if(e.key === 'Enter'){
-      e.preventDefault();
-      addTodoItemFromInput(input);
-    }
-  });
-});
 
 function renderHome(){
   clearInterval(state.quoteTimer);
