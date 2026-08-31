@@ -339,21 +339,6 @@ kbd{
   .mobile-tabbar{ display:none; }
 }
 
-/* ===== OUR ARCHIVE mobile home widgets ===== */
-.mobile-home-widgets{display:none;}
-@media (max-width:1500px){.side-panel{display:none !important;}}
-@media (max-width:640px){
-  .mobile-home-widgets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 22px;}
-  .mobile-home-widget{min-width:0;}
-  .mobile-home-widget summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;min-height:42px;padding:8px 4px;border:1px solid var(--border-soft);border-radius:14px;background:var(--surface);color:var(--text);font-size:12px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.04);}
-  .mobile-home-widget summary::-webkit-details-marker{display:none;}
-  .mobile-home-widget[open]{grid-column:1 / -1;}
-  .mobile-home-widget[open] summary{margin-bottom:8px;}
-  .mobile-home-widget .paper-card{width:100%;box-sizing:border-box;}
-  main.max-w-5xl{padding-left:14px !important;padding-right:14px !important;padding-top:14px !important;padding-bottom:80px !important;}
-  .mobile-home-widgets + p + h1{font-size:1.85rem !important;}
-}
-
 /* ============================================================
    사주 운세 확장 UI · 신비로운 수호수 카드
    ============================================================ */
@@ -2037,11 +2022,6 @@ function renderHome(){
 
   const html = `
     <section class="fade-in mb-10">
-      <div class="mobile-home-widgets" aria-label="홈 위젯">
-        <details class="mobile-home-widget"><summary>📅 캘린더</summary><div class="mobile-widget-body">${miniCalendarHtml()}</div></details>
-        <details class="mobile-home-widget"><summary>☀️ 날씨</summary><div class="mobile-widget-body">${weatherWidgetHtml()}</div></details>
-        <details class="mobile-home-widget"><summary>✓ 할 일</summary><div class="mobile-widget-body">${todoWidgetsHtml()}</div></details>
-      </div>
       <p class="text-3sm font-bold mb-1" style="color:var(--text)">${formatDateKR(today)}</p>
       <h1 class="font-semibold text-4xl sm:text-5xl mb-3" style="color:#5c5b5a">조각 모음.zip</h1>
       <div style="overflow:hidden; min-height:1.6em;" class="mb-6">
