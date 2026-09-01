@@ -333,12 +333,216 @@ kbd{
   .side-panel{ display:none; }
 }
 
-@media (max-width: 640px){
-  .desktop-nav{ display:none; }
-  .mobile-tabbar{ display:flex; }
+/* ============================================================
+   MOBILE APP LAYOUT
+   - PC layout is kept intact.
+   - On phones the desktop navigation becomes a compact header.
+   - Side widgets become expandable quick-widget cards.
+   - Bottom 7-item navigation is removed to avoid crowding.
+   ============================================================ */
+.mobile-menu-button{
+  display:none;
+  width:42px; height:42px;
+  align-items:center; justify-content:center;
+  border:1px solid rgba(35,52,50,.12);
+  border-radius:15px;
+  background:#faf7ef;
+  color:var(--text);
+  font-size:21px;
+  line-height:1;
+  box-shadow:var(--shadow-sm);
 }
-@media (min-width: 641px){
-  .mobile-tabbar{ display:none; }
+.mobile-menu-overlay{
+  display:none;
+  position:fixed; inset:0;
+  z-index:100;
+  background:rgba(35,52,50,.22);
+  backdrop-filter:blur(2px);
+}
+.mobile-menu-overlay.show{ display:block; }
+.mobile-menu-panel{
+  position:absolute;
+  top:0; right:0;
+  width:min(88vw,360px);
+  height:100%;
+  overflow-y:auto;
+  background:#faf7ef;
+  border-left:1px solid var(--border-soft);
+  box-shadow:-18px 0 50px rgba(35,52,50,.16);
+  transform:translateX(100%);
+  transition:transform .28s cubic-bezier(.2,.8,.2,1);
+  padding:18px 16px 28px;
+}
+.mobile-menu-overlay.show .mobile-menu-panel{ transform:translateX(0); }
+.mobile-menu-head{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; margin-bottom:18px;
+}
+.mobile-menu-close{
+  width:40px; height:40px; border:1px solid var(--border-soft);
+  border-radius:14px; background:var(--surface); color:var(--text);
+  font-size:24px; line-height:1;
+}
+.mobile-menu-user{
+  padding:12px 14px; border-radius:18px;
+  background:#eee8f8; border:1px solid #ddd4ee;
+  margin-bottom:14px;
+}
+.mobile-menu-items{ display:flex; flex-direction:column; gap:7px; }
+.mobile-menu-item{
+  width:100%; display:flex; align-items:center; gap:12px;
+  padding:13px 14px; border:1px solid transparent;
+  border-radius:16px; background:transparent; color:var(--text);
+  text-align:left; font-weight:650; font-size:.94rem;
+}
+.mobile-menu-item .menu-icon{ width:28px; text-align:center; font-size:1.1rem; }
+.mobile-menu-item.active{ background:#dff3eb; border-color:#c8e9dc; }
+.mobile-menu-item:active{ transform:scale(.99); }
+.mobile-menu-divider{
+  margin:16px 0; border:0; border-top:2px dotted #d0c7ee;
+}
+.mobile-menu-actions{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.mobile-menu-action{
+  padding:11px 8px; border-radius:14px; border:1px solid var(--border-soft);
+  background:var(--surface); color:var(--text); font-size:.82rem; font-weight:650;
+}
+.mobile-tabbar{ display:none !important; }
+.desktop-header-actions{ display:flex; }
+
+@media (max-width: 640px){
+  body{
+    overflow-x:hidden;
+    background-size:520px 460px;
+  }
+  #app{ padding-bottom:0 !important; }
+  .desktop-nav{ display:none !important; }
+  .mobile-menu-button{ display:flex; }
+  .mobile-only-actions{ display:flex !important; }
+  .desktop-header-actions{ display:none !important; }
+
+  header{
+    position:sticky !important;
+    top:0;
+    z-index:90 !important;
+  }
+  header > .max-w-5xl{
+    min-height:64px;
+    padding:8px 14px !important;
+    gap:8px;
+  }
+  header [data-nav="home"]{
+    min-width:0;
+    flex:1 1 auto;
+  }
+  header [data-nav="home"] > span:last-child{
+    font-size:1.02rem !important;
+    white-space:nowrap;
+  }
+  header [data-nav="home"] > span:first-child{
+    width:34px !important; height:33px !important;
+    font-size:14px !important; flex-shrink:0;
+  }
+  header [data-nav="home"] > span:first-child span{
+    font-size:8px !important;
+  }
+  header .mobile-header-actions{
+    display:flex !important; align-items:center; gap:7px;
+  }
+  header .mobile-header-actions #theme-toggle{
+    width:42px; height:42px; padding:0 !important;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:15px;
+  }
+  header .mobile-header-actions #logout-btn{ display:none; }
+
+  main.max-w-5xl{
+    width:100%; max-width:none !important;
+    padding:18px 14px 38px !important;
+  }
+  main.max-w-5xl > *{ min-width:0; }
+
+  /* Mobile quick widgets: calendar / weather / todo */
+  .mobile-home-widgets{
+    display:grid !important;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:7px; margin:0 0 20px;
+  }
+  .mobile-home-widget{ min-width:0; }
+  .mobile-home-widget summary{
+    min-height:48px; padding:8px 3px;
+    border:1px solid var(--border-soft);
+    border-radius:16px; background:rgba(250,247,239,.94);
+    color:var(--text); font-size:11.5px; font-weight:750;
+    box-shadow:0 3px 12px rgba(34,84,74,.06);
+  }
+  .mobile-home-widget summary::before{
+    content:""; width:5px; height:5px; border-radius:50%;
+    background:var(--brand-pink); flex-shrink:0;
+  }
+  .mobile-home-widget[open]{ grid-column:1 / -1; }
+  .mobile-home-widget[open] summary{ margin-bottom:8px; }
+  .mobile-widget-body{
+    width:100%; overflow:hidden;
+    border-radius:18px;
+  }
+  .mobile-widget-body .paper-card{
+    width:100% !important; box-sizing:border-box;
+    box-shadow:var(--shadow-sm);
+  }
+  .mobile-widget-body .side-panel{ display:none !important; }
+
+  /* Home typography */
+  .mobile-home-widgets + p{
+    font-size:.78rem !important;
+    letter-spacing:.01em;
+  }
+  .mobile-home-widgets + p + h1{
+    font-size:2rem !important;
+    line-height:1.12 !important;
+    letter-spacing:-.055em;
+    margin-bottom:10px !important;
+    word-break:keep-all;
+  }
+  #home-quote{
+    font-size:.86rem !important;
+    line-height:1.65 !important;
+    -webkit-text-stroke:.25px #000 !important;
+    word-break:keep-all;
+  }
+  .link-cta{ font-size:1rem; }
+
+  /* Mood row: keep all seven visible without horizontal overflow */
+  #quick-mood-row{
+    display:grid !important;
+    grid-template-columns:repeat(7,minmax(0,1fr));
+    gap:4px !important;
+  }
+  #quick-mood-row .mood-pick{
+    min-width:0 !important; width:100%;
+    padding:9px 1px !important;
+    border-radius:24px;
+  }
+  #quick-mood-row .mood-pick span.emoji{ font-size:1.25rem; }
+  #quick-mood-row .mood-pick span.label{ font-size:.58rem; }
+
+  /* Recent entries become a comfortable single column */
+  .entry-card{ min-width:0; }
+  .grid.sm\:grid-cols-2.lg\:grid-cols-3{
+    grid-template-columns:1fr !important;
+  }
+  .paper-card:hover{ transform:none; }
+
+  /* Prevent long form rows from overflowing on phones */
+  .grid.grid-cols-2{ grid-template-columns:1fr !important; }
+  .fortune-tabs{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+
+  /* Mobile menu */
+  .mobile-menu-panel .font-hand{ font-size:1.15rem !important; }
+}
+
+@media (min-width:641px){
+  .mobile-header-actions{ display:none !important; }
+  .mobile-menu-overlay{ display:none !important; }
 }
 
 /* ============================================================
@@ -1588,67 +1792,99 @@ function renderShell(innerHtml){
       <div class="max-w-5xl mx-auto px-5 py-3 flex items-center justify-between">
         <button data-nav="home" class="flex items-center gap-2" style="color:var(--text)">
           <span style="
-  width:40px;
-  height:38px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  border:2px solid var(--text);
-  border-radius:90%;
-  background:#eee0f4;
-  font-family:'SEKUYA', sns-serif;
-  font-size:16px;
-  font-weight:300;
-  font-style:normal;
-  color:var(--text);
-  position:relative;
-">
-  OA
-  <span style="
-    position:absolute;
-    left:65%;
-    transform:translateX(2px);
-    bottom:-1px;
-    font-family:'SEKUYA';
-    font-size:10px;
-    letter-spacing:2px;
-  ">••</span>
- <span style="
-    position:absolute;
-    left:-20%;
-    top:0px;
-    transform:translateX(2px);
-    font-family:'SEKUYA';
-    font-size:10px;
-    letter-spacing:2px;
-  ">••</span>
-
-</span>
+            width:40px; height:38px; display:flex; align-items:center; justify-content:center;
+            border:2px solid var(--text); border-radius:90%; background:#eee0f4;
+            font-family:'SEKUYA', sans-serif; font-size:16px; font-weight:300;
+            font-style:normal; color:var(--text); position:relative;">
+            OA
+            <span style="position:absolute;left:65%;transform:translateX(2px);bottom:-1px;font-family:'SEKUYA';font-size:10px;letter-spacing:2px;">••</span>
+            <span style="position:absolute;left:-20%;top:0;transform:translateX(2px);font-family:'SEKUYA';font-size:10px;letter-spacing:2px;">••</span>
+          </span>
           <span class="font-bold text-xl">Our Archive</span>
         </button>
+
         <nav class="desktop-nav flex items-center gap-7">
           ${NAV_ITEMS.map(it => `<button data-nav="${it.key}" class="nav-link ${state.view===it.key?'active':''}">${it.label}</button>`).join('')}
         </nav>
-        <div class="flex items-center gap-2">
+
+        <div class="mobile-header-actions items-center gap-2">
+          <button id="theme-toggle" class="btn-ghost btn-ivory !px-3 !py-2 text-sm" title="테마 변경">${state.theme==='dark'?'☀️':'🌙'}</button>
+          <button id="mobile-menu-button" class="mobile-menu-button" aria-label="메뉴 열기" aria-expanded="false">☰</button>
+        </div>
+
+        <div class="desktop-header-actions flex items-center gap-2">
           ${state.username ? `<span class="text-xs hidden sm:inline" style="color:var(--text-muted)">@${escapeHtml(state.username)}</span>` : ''}
-          <button id="theme-toggle" class="btn-ghost btn-ivory !px-3 !py-2 text-sm" title="Toggle dark mode (shortcut: D)">${state.theme==='dark'?'☀️':'🌙'}</button>
+          <button id="desktop-theme-toggle" class="btn-ghost btn-ivory !px-3 !py-2 text-sm" title="Toggle dark mode (shortcut: D)">${state.theme==='dark'?'☀️':'🌙'}</button>
           <button id="logout-btn" class="btn-ghost btn-ivory !px-3 !py-2 text-sm" title="로그아웃">🚪</button>
         </div>
       </div>
     </header>
+
     <main class="max-w-5xl mx-auto px-5 pt-6">${innerHtml}</main>
-    <nav class="mobile-tabbar fixed bottom-0 left-0 right-0 z-40 justify-around items-center py-2" style="background:var(--surface); border-top:1px solid var(--border-soft); box-shadow:0 -4px 14px -6px rgba(0,0,0,0.08);">
-      ${NAV_ITEMS.map(it => `
-        <button data-nav="${it.key}" class="flex flex-col items-center gap-0.5 px-3 py-1" style="color:${state.view===it.key?'var(--text)':'var(--text-muted)'}">
-          <span style="font-size:1.15rem;">${it.icon}</span>
-          <span style="font-size:.66rem; font-weight:600;">${it.label}</span>
-        </button>`).join('')}
-    </nav>
-    ${sidePanelsHtml()}
+
+    <div class="mobile-menu-overlay" id="mobile-menu-overlay" aria-hidden="true">
+      <aside class="mobile-menu-panel" role="dialog" aria-modal="true" aria-label="메뉴">
+        <div class="mobile-menu-head">
+          <div>
+            <div class="font-hand text-xl" style="color:var(--text)">Our Archive</div>
+            <div class="text-xs mt-1" style="color:var(--text-muted)">나의 기록을 모아두는 곳</div>
+          </div>
+          <button type="button" id="mobile-menu-close" class="mobile-menu-close" aria-label="메뉴 닫기">×</button>
+        </div>
+
+        <div class="mobile-menu-user">
+          <div class="text-xs" style="color:var(--text-muted)">현재 계정</div>
+          <div class="font-semibold mt-1" style="color:var(--text)">${state.username ? '@'+escapeHtml(state.username) : '내 Archive'}</div>
+        </div>
+
+        <div class="mobile-menu-items">
+          ${NAV_ITEMS.map(it => `
+            <button type="button" data-mobile-nav="${it.key}" class="mobile-menu-item ${state.view===it.key?'active':''}">
+              <span class="menu-icon">${it.icon}</span>
+              <span>${it.label}</span>
+            </button>`).join('')}
+        </div>
+
+        <hr class="mobile-menu-divider" />
+
+        <div class="mobile-menu-actions">
+          <button type="button" id="mobile-theme-toggle" class="mobile-menu-action">${state.theme==='dark'?'☀️ 라이트 모드':'🌙 다크 모드'}</button>
+          <button type="button" id="mobile-logout-btn" class="mobile-menu-action">🚪 로그아웃</button>
+        </div>
+      </aside>
+    </div>
   `;
+
+  const openMobileMenu = () => {
+    const overlay = document.getElementById('mobile-menu-overlay');
+    const button = document.getElementById('mobile-menu-button');
+    if(!overlay) return;
+    overlay.classList.add('show');
+    overlay.setAttribute('aria-hidden','false');
+    button?.setAttribute('aria-expanded','true');
+    document.body.style.overflow='hidden';
+  };
+  const closeMobileMenu = () => {
+    const overlay = document.getElementById('mobile-menu-overlay');
+    const button = document.getElementById('mobile-menu-button');
+    if(!overlay) return;
+    overlay.classList.remove('show');
+    overlay.setAttribute('aria-hidden','true');
+    button?.setAttribute('aria-expanded','false');
+    document.body.style.overflow='';
+  };
+
   app.querySelectorAll('[data-nav]').forEach(btn => {
     btn.addEventListener('click', () => {
       const target = btn.getAttribute('data-nav');
+      if(target === 'write'){ beginWrite(); }
+      else { nav(target); }
+    });
+  });
+  app.querySelectorAll('[data-mobile-nav]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.getAttribute('data-mobile-nav');
+      closeMobileMenu();
       if(target === 'write'){ beginWrite(); }
       else { nav(target); }
     });
@@ -1660,10 +1896,27 @@ function renderShell(innerHtml){
       else { nav(target); }
     });
   });
+
+  document.getElementById('mobile-menu-button')?.addEventListener('click', openMobileMenu);
+  document.getElementById('mobile-menu-close')?.addEventListener('click', closeMobileMenu);
+  document.getElementById('mobile-menu-overlay')?.addEventListener('click', e => {
+    if(e.target.id === 'mobile-menu-overlay') closeMobileMenu();
+  });
+  document.getElementById('mobile-theme-toggle')?.addEventListener('click', () => {
+    closeMobileMenu();
+    toggleTheme();
+  });
+  document.getElementById('mobile-logout-btn')?.addEventListener('click', () => {
+    closeMobileMenu();
+    document.getElementById('logout-btn')?.click();
+  });
+
   wireMiniCalendar();
   wireTodoWidgets();
-  document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
-  document.getElementById('logout-btn').addEventListener('click', () => {
+
+  document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
+  document.getElementById('desktop-theme-toggle')?.addEventListener('click', toggleTheme);
+  document.getElementById('logout-btn')?.addEventListener('click', () => {
     showModal({
       title:'로그아웃 할까요?',
       body:'다시 로그인하면 저장된 기록을 이어서 볼 수 있어요.',
@@ -1673,14 +1926,14 @@ function renderShell(innerHtml){
         try{
           await DB.signOut();
           state.entries = [];
+          state.todos = {};
+          state.travelPins = [];
           state.userId = null;
           state.username = '';
-          state.authMode = 'login';
-          state.authError = null;
-          nav('auth');
+          state.view = 'auth';
+          renderApp();
         }catch(err){
-          console.error(err);
-          showToast('로그아웃에 실패했어요');
+          showToast('로그아웃 실패: '+(err?.message||err));
         }
       }
     });
