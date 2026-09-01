@@ -2947,7 +2947,9 @@ function renderTravelSearchResults(){
     btn.addEventListener('click', () => {
       const r = state.travelSearchResults[Number(btn.getAttribute('data-search-result'))];
       if(!r || !travelMap) return;
-      travelMap.flyTo([Number(r.lat), Number(r.lon)], 13, { duration:0.8 });
+      travelMap.flyTo([Number(r.lat), Number(r.lon)], 18, {
+  duration: 1.2
+});
       state.travelSearchResults = []; el.innerHTML = '';
     });
   });
