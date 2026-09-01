@@ -329,16 +329,111 @@ kbd{
 .side-panel-right{ right: calc(50% - 512px - 16px - 200px); }
 .side-panel .chip{ cursor:pointer; border:none; }
 .side-panel .chip:hover{ background:var(--brand-pink); color:#fff; }
+/* ================= 모바일 / 반응형 레이아웃 ================= */
+.mobile-menu-toggle,.mobile-menu-overlay,.mobile-menu-drawer,.mobile-home-tools{display:none;}
+
+/* 데스크톱에서는 양쪽 사이드 패널을 반드시 유지 */
+@media (min-width: 1501px){
+  .side-panel{ display:block; }
+  .side-panel-left{ display:flex; flex-direction:column; gap:12px; }
+}
+
 @media (max-width: 1500px){
   .side-panel{ display:none; }
 }
 
-@media (max-width: 640px){
-  .desktop-nav{ display:none; }
-  .mobile-tabbar{ display:flex; }
+@media (max-width: 767px){
+  body{ overflow-x:hidden; }
+  .desktop-nav,.mobile-tabbar{ display:none !important; }
+
+  header > div{
+    padding-left:14px !important;
+    padding-right:14px !important;
+    padding-top:9px !important;
+    padding-bottom:9px !important;
+  }
+  header [data-nav="home"]{ min-width:0; }
+  header [data-nav="home"] > span:last-child{
+    font-size:1.05rem !important;
+    white-space:nowrap;
+  }
+  header [data-nav="home"] > span:first-child{
+    width:34px !important; height:33px !important;
+    font-size:14px !important; flex-shrink:0;
+  }
+  #logout-btn{ display:none; }
+  #theme-toggle{ padding:.48rem .65rem !important; }
+
+  .mobile-menu-toggle{
+    display:flex; align-items:center; justify-content:center;
+    width:38px; height:38px; border:1px solid #B8ACDF;
+    border-radius:12px; background:#eee0f4; color:var(--text);
+    font-size:20px; line-height:1;
+  }
+  .mobile-menu-overlay{
+    position:fixed; inset:0; background:rgba(35,52,50,.28);
+    z-index:100; opacity:0; pointer-events:none; transition:opacity .22s ease;
+    display:block;
+  }
+  .mobile-menu-overlay.open{ opacity:1; pointer-events:auto; }
+  .mobile-menu-drawer{
+    display:block; position:fixed; top:0; right:0; bottom:0; width:min(82vw,330px);
+    background:var(--surface); z-index:110; padding:22px 18px;
+    box-shadow:-12px 0 35px rgba(35,52,50,.16);
+    transform:translateX(105%); transition:transform .25s ease;
+    overflow-y:auto;
+  }
+  .mobile-menu-drawer.open{ transform:translateX(0); }
+  .mobile-menu-close{
+    width:38px;height:38px;border-radius:12px;border:1px solid var(--border);
+    background:var(--bg); color:var(--text); font-size:20px;
+  }
+  .mobile-menu-item{
+    width:100%; display:flex; align-items:center; gap:12px; padding:14px 12px;
+    border-radius:14px; margin-top:5px; color:var(--text); font-weight:700; text-align:left;
+    background:transparent; border:1px solid transparent;
+  }
+  .mobile-menu-item.active{ background:var(--bg-soft); border-color:var(--border-soft); }
+  .mobile-menu-item .mi-icon{ width:28px; text-align:center; font-size:19px; }
+
+  main.max-w-5xl{
+    width:100%; max-width:none !important;
+    padding:18px 16px 36px !important;
+  }
+  main .stitch{ margin-top:1.8rem !important; margin-bottom:1.8rem !important; }
+
+  /* 홈 상단의 모바일 전용 빠른 위젯 */
+  .mobile-home-tools{
+    width:100%; max-width:1024px; margin:0 auto 18px; padding:0 16px;
+    display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px;
+  }
+  .mobile-tool-card{
+    min-width:0; padding:11px 8px; border:1px solid var(--border-soft);
+    border-radius:16px; background:rgba(250,247,239,.9); box-shadow:var(--shadow-sm);
+    text-align:left; color:var(--text);
+  }
+  .mobile-tool-card .tool-icon{ font-size:17px; display:block; margin-bottom:4px; }
+  .mobile-tool-card .tool-title{ font-size:11px; font-weight:800; display:block; white-space:nowrap; }
+  .mobile-tool-card .tool-sub{ font-size:9px; color:var(--text-muted); display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  #quick-mood-row{
+    flex-wrap:nowrap !important; overflow-x:auto; padding:3px 2px 8px;
+    margin-right:-4px; scrollbar-width:none;
+  }
+  #quick-mood-row::-webkit-scrollbar{ display:none; }
+  .mood-pick{ flex:0 0 56px; }
+
+  .grid.sm\:grid-cols-2.lg\:grid-cols-3{ grid-template-columns:1fr !important; }
+  .entry-card{ min-width:0; }
+  .entry-card .text-sm{ line-height:1.55; }
+
+  /* 홈 제목과 카드가 작은 화면에서 지나치게 커지지 않도록 */
+  main h1{ line-height:1.12; word-break:keep-all; }
+  main h2{ word-break:keep-all; }
 }
-@media (min-width: 641px){
-  .mobile-tabbar{ display:none; }
+
+@media (min-width: 768px){
+  .mobile-menu-toggle,.mobile-menu-overlay,.mobile-menu-drawer,.mobile-home-tools{display:none !important;}
 }
 
 /* ============================================================
@@ -1581,49 +1676,43 @@ function sidePanelsHtml(){
   `;
 }
 
+function mobileHomeToolsHtml(){
+  const todoCount = Object.values(state.todos || {}).reduce((sum, items) => sum + ((items || []).length), 0);
+  const weather = Array.isArray(state.weatherData) && state.weatherData.length ? state.weatherData[0] : null;
+  let weatherText = '날씨 보기';
+  if(weather && weather.current){
+    const temp = weather.current.temperature_2m != null ? Math.round(weather.current.temperature_2m) + '°' : '';
+    weatherText = (weather.name || '오늘') + (temp ? ' · ' + temp : '');
+  }
+  return `
+    <div class="mobile-home-tools">
+      <button type="button" class="mobile-tool-card" data-mobile-nav="calendar">
+        <span class="tool-icon">📅</span><span class="tool-title">캘린더</span>
+        <span class="tool-sub">${escapeHtml(formatDateKR(todayStr(), false))}</span>
+      </button>
+      <button type="button" class="mobile-tool-card" data-mobile-nav="home-weather">
+        <span class="tool-icon">☀️</span><span class="tool-title">오늘의 날씨</span>
+        <span class="tool-sub">${escapeHtml(weatherText)}</span>
+      </button>
+      <button type="button" class="mobile-tool-card" data-mobile-nav="travelmap">
+        <span class="tool-icon">🗺️</span><span class="tool-title">여행지도</span>
+        <span class="tool-sub">내 여행 기록 보기</span>
+      </button>
+    </div>`;
+}
+
 function renderShell(innerHtml){
   const app = document.getElementById('app');
+  const mobileTools = state.view === 'home' ? mobileHomeToolsHtml() : '';
   app.innerHTML = `
     <header class="sticky top-0 z-40" style="background: color-mix(in srgb, #D0C7EE 90%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid #B8ACDF;">
       <div class="max-w-5xl mx-auto px-5 py-3 flex items-center justify-between">
         <button data-nav="home" class="flex items-center gap-2" style="color:var(--text)">
-          <span style="
-  width:40px;
-  height:38px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  border:2px solid var(--text);
-  border-radius:90%;
-  background:#eee0f4;
-  font-family:'SEKUYA', sns-serif;
-  font-size:16px;
-  font-weight:300;
-  font-style:normal;
-  color:var(--text);
-  position:relative;
-">
-  OA
-  <span style="
-    position:absolute;
-    left:65%;
-    transform:translateX(2px);
-    bottom:-1px;
-    font-family:'SEKUYA';
-    font-size:10px;
-    letter-spacing:2px;
-  ">••</span>
- <span style="
-    position:absolute;
-    left:-20%;
-    top:0px;
-    transform:translateX(2px);
-    font-family:'SEKUYA';
-    font-size:10px;
-    letter-spacing:2px;
-  ">••</span>
-
-</span>
+          <span style="width:40px;height:38px;display:flex;align-items:center;justify-content:center;border:2px solid var(--text);border-radius:90%;background:#eee0f4;font-family:'SEKUYA',sans-serif;font-size:16px;font-weight:300;color:var(--text);position:relative;">
+            OA
+            <span style="position:absolute;left:65%;transform:translateX(2px);bottom:-1px;font-family:'SEKUYA';font-size:10px;letter-spacing:2px;">••</span>
+            <span style="position:absolute;left:-20%;top:0px;transform:translateX(2px);font-family:'SEKUYA';font-size:10px;letter-spacing:2px;">••</span>
+          </span>
           <span class="font-bold text-xl">Our Archive</span>
         </button>
         <nav class="desktop-nav flex items-center gap-7">
@@ -1631,35 +1720,82 @@ function renderShell(innerHtml){
         </nav>
         <div class="flex items-center gap-2">
           ${state.username ? `<span class="text-xs hidden sm:inline" style="color:var(--text-muted)">@${escapeHtml(state.username)}</span>` : ''}
-          <button id="theme-toggle" class="btn-ghost btn-ivory !px-3 !py-2 text-sm" title="Toggle dark mode (shortcut: D)">${state.theme==='dark'?'☀️':'🌙'}</button>
+          <button id="theme-toggle" class="btn-ghost btn-ivory !px-3 !py-2 text-sm" title="Toggle dark mode">${state.theme==='dark'?'☀️':'🌙'}</button>
           <button id="logout-btn" class="btn-ghost btn-ivory !px-3 !py-2 text-sm" title="로그아웃">🚪</button>
+          <button type="button" id="mobile-menu-toggle" class="mobile-menu-toggle" aria-label="메뉴 열기">☰</button>
         </div>
       </div>
     </header>
+
+    ${mobileTools}
     <main class="max-w-5xl mx-auto px-5 pt-6">${innerHtml}</main>
-    <nav class="mobile-tabbar fixed bottom-0 left-0 right-0 z-40 justify-around items-center py-2" style="background:var(--surface); border-top:1px solid var(--border-soft); box-shadow:0 -4px 14px -6px rgba(0,0,0,0.08);">
-      ${NAV_ITEMS.map(it => `
-        <button data-nav="${it.key}" class="flex flex-col items-center gap-0.5 px-3 py-1" style="color:${state.view===it.key?'var(--text)':'var(--text-muted)'}">
-          <span style="font-size:1.15rem;">${it.icon}</span>
-          <span style="font-size:.66rem; font-weight:600;">${it.label}</span>
-        </button>`).join('')}
-    </nav>
+
+    <div id="mobile-menu-overlay" class="mobile-menu-overlay"></div>
+    <aside id="mobile-menu-drawer" class="mobile-menu-drawer" aria-hidden="true">
+      <div class="flex items-center justify-between mb-5">
+        <div>
+          <p class="font-hand text-xl">Our Archive</p>
+          <p class="text-xs" style="color:var(--text-muted)">@${escapeHtml(state.username || '')}</p>
+        </div>
+        <button type="button" id="mobile-menu-close" class="mobile-menu-close">×</button>
+      </div>
+      <div>
+        ${NAV_ITEMS.map(it => `
+          <button type="button" data-mobile-nav="${it.key}" class="mobile-menu-item ${state.view===it.key?'active':''}">
+            <span class="mi-icon">${it.icon}</span><span>${it.label}</span>
+          </button>`).join('')}
+      </div>
+      <div class="double-divider my-5"></div>
+      <button type="button" id="mobile-logout" class="mobile-menu-item">
+        <span class="mi-icon">🚪</span><span>로그아웃</span>
+      </button>
+    </aside>
+
     ${sidePanelsHtml()}
   `;
+
   app.querySelectorAll('[data-nav]').forEach(btn => {
     btn.addEventListener('click', () => {
       const target = btn.getAttribute('data-nav');
-      if(target === 'write'){ beginWrite(); }
-      else { nav(target); }
+      if(target === 'write'){ beginWrite(); } else { nav(target); }
     });
   });
   app.querySelectorAll('[data-side-nav]').forEach(btn => {
     btn.addEventListener('click', () => {
       const target = btn.getAttribute('data-side-nav');
-      if(target === 'write'){ beginWrite(); }
-      else { nav(target); }
+      if(target === 'write'){ beginWrite(); } else { nav(target); }
     });
   });
+  app.querySelectorAll('[data-mobile-nav]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.getAttribute('data-mobile-nav');
+      if(target === 'home-weather'){
+        closeMobileMenu();
+        document.querySelector('.side-panel-left')?.scrollIntoView({behavior:'smooth'});
+        return;
+      }
+      closeMobileMenu();
+      if(target === 'write'){ beginWrite(); } else { nav(target); }
+    });
+  });
+
+  function openMobileMenu(){
+    document.getElementById('mobile-menu-drawer')?.classList.add('open');
+    document.getElementById('mobile-menu-overlay')?.classList.add('open');
+    document.getElementById('mobile-menu-drawer')?.setAttribute('aria-hidden','false');
+    document.body.style.overflow='hidden';
+  }
+  function closeMobileMenu(){
+    document.getElementById('mobile-menu-drawer')?.classList.remove('open');
+    document.getElementById('mobile-menu-overlay')?.classList.remove('open');
+    document.getElementById('mobile-menu-drawer')?.setAttribute('aria-hidden','true');
+    document.body.style.overflow='';
+  }
+  document.getElementById('mobile-menu-toggle')?.addEventListener('click', openMobileMenu);
+  document.getElementById('mobile-menu-close')?.addEventListener('click', closeMobileMenu);
+  document.getElementById('mobile-menu-overlay')?.addEventListener('click', closeMobileMenu);
+  document.getElementById('mobile-logout')?.addEventListener('click', () => { closeMobileMenu(); document.getElementById('logout-btn')?.click(); });
+
   wireMiniCalendar();
   wireTodoWidgets();
   document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
