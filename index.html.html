@@ -781,12 +781,7 @@ function musicCardHtml(date){
   return `
     <div class="paper-card p-5 music-card my-6" id="music-card">
       <div class="flex items-center justify-between gap-3 mb-4">
-        <div>
-          <h2 class="font-hand text-xl flex items-center gap-2" style="color:var(--text)">
-            <span>🎵</span> 오늘의 노래
-          </h2>
-          <p class="music-current-label mt-1">${musicDateLabel(date)} · ${list.length ? `${list.length}곡` : '플레이리스트 없음'}</p>
-        </div>
+        <p class="music-current-label">${musicDateLabel(date)} · ${list.length ? `${list.length}곡` : '플레이리스트 없음'}</p>
         <span class="text-xs" style="color:var(--text-muted)">YouTube</span>
       </div>
 
@@ -2324,7 +2319,7 @@ function renderMusicPage(){
       <div class="flex items-end justify-between gap-4 mb-5">
         <div>
           <p class="text-xs mb-1" style="color:var(--text-muted)">${isToday ? 'TODAY' : 'PLAYLIST'}</p>
-          <h1 class="font-semibold text-3xl sm:text-4xl" style="color:var(--text)">오늘의 노래 🎵</h1>
+          <h1 class="font-hand text-3xl" style="color:var(--text)">오늘의 노래</h1>
           <p class="text-sm mt-2" style="color:var(--text-muted)">날짜별로 내가 듣고 싶은 노래를 모아두는 공간이에요.</p>
         </div>
       </div>
