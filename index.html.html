@@ -2480,8 +2480,6 @@ function renderHome(){
       <!-- 상단 스티치 구분선 -->
       <div class="stitch my-10"></div>
 
-    ${musicCardHtml(state.musicDate || today)}
-
     <section class="fade-in">
       <div class="flex items-center justify-between mb-4">
         <h2 class="font-hand text-2xl" style="color:var(--text)">최근 기록</h2>
@@ -2532,6 +2530,8 @@ function renderHome(){
           ${fortuneResultHtml(fortuneCalc)}
         `}
       </div>
+
+      ${musicCardHtml(state.musicDate || today)}
 
   `;
   renderShell(html);
