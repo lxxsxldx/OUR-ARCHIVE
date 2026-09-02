@@ -783,7 +783,7 @@ function musicCardHtml(date){
       <div class="flex items-center justify-between gap-3 mb-4">
         <div>
           <h2 class="font-hand text-xl flex items-center gap-2" style="color:var(--text)">
-            <span> </span> 오늘의 노래
+            <span>🎵</span> 오늘의 노래
           </h2>
           <p class="music-current-label mt-1">${musicDateLabel(date)} · ${list.length ? `${list.length}곡` : '플레이리스트 없음'}</p>
         </div>
@@ -2291,7 +2291,6 @@ function musicMiniWidgetHtml(){
     <div class="music-mini-widget paper-card p-3" role="button" tabindex="0" aria-label="오늘의 노래 열기" data-open-music-widget>
       <div class="flex items-center justify-between gap-2 mb-2">
         <div class="flex items-center gap-1.5 min-w-0">
-          <span class="text-sm">🎵</span>
           <h3 class="font-hand text-lg mb-3 truncate" style="color:var(--text)">오늘의 노래</h3>
         </div>
         <span class="text-[10px] px-2 py-0.5 rounded-full" style="background:var(--bg-soft);color:var(--text-muted)">${list.length}곡</span>
