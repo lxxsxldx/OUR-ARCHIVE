@@ -383,6 +383,12 @@ kbd{
 @media(max-width:640px){ #travel-map{ height:340px; } }
   
 
+.music-mini-widget{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease;background:#faf7ef;}
+.music-mini-widget:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm);}
+.music-mini-widget:focus-visible{outline:2px solid var(--text);outline-offset:2px;}
+.music-mini-row{display:flex;align-items:center;gap:8px;min-width:0;}
+.music-mini-thumb{width:48px;height:34px;flex:0 0 48px;border-radius:7px;object-fit:cover;border:1px solid var(--border-soft);background:var(--bg-soft);}
+
 /* ============================================================
    오늘의 노래 · YouTube 플레이리스트
    ============================================================ */
@@ -870,7 +876,7 @@ function changeMusicDate(date){
   if(!date) return;
   state.musicDate = date;
   state.musicSelectedIndex = 0;
-  renderHome();
+  renderMusicPage();
   requestAnimationFrame(() => {
     document.getElementById('music-card')?.scrollIntoView({behavior:'smooth', block:'center'});
   });
@@ -891,7 +897,7 @@ function wireMusicCard(date){
   document.querySelectorAll('[data-music-index]').forEach(el => {
     const selectTrack = () => {
       state.musicSelectedIndex = Number(el.getAttribute('data-music-index')) || 0;
-      renderHome();
+      renderMusicPage();
     };
     el.addEventListener('click', selectTrack);
     el.addEventListener('keydown', e => {
@@ -901,12 +907,12 @@ function wireMusicCard(date){
 
   document.getElementById('music-prev')?.addEventListener('click', () => {
     state.musicSelectedIndex = Math.max(0, (state.musicSelectedIndex||0)-1);
-    renderHome();
+    renderMusicPage();
   });
   document.getElementById('music-next')?.addEventListener('click', () => {
     const list = getMusicList(date);
     state.musicSelectedIndex = Math.min(list.length-1, (state.musicSelectedIndex||0)+1);
-    renderHome();
+    renderMusicPage();
   });
 
   document.getElementById('music-play')?.addEventListener('click', () => {
@@ -936,7 +942,7 @@ function wireMusicCard(date){
           setMusicList(date, next);
           state.musicSelectedIndex = Math.min(state.musicSelectedIndex||0, Math.max(next.length-1,0));
           showToast('노래를 삭제했어요');
-          renderHome();
+          renderMusicPage();
         }
       });
     });
@@ -972,7 +978,7 @@ function wireMusicCard(date){
     setMusicList(date, list);
     state.musicSelectedIndex = list.length-1;
     showToast('오늘의 노래에 추가했어요 🎵');
-    renderHome();
+    renderMusicPage();
   });
 }
 
@@ -1907,6 +1913,7 @@ const NAV_ITEMS = [
   { key:'calendar', label:'캘린더',   icon:'📅' },
   { key:'travelmap',label:'여행지도', icon:'🗺️' },
   { key:'fortune',  label:'사주·운세', icon:'🔮' },
+  { key:'music',    label:'오늘의 노래', icon:'🎵' },
   { key:'stats',    label:'통계',   icon:'📊' },
 ];
 
@@ -1916,6 +1923,7 @@ function sidePanelsHtml(){
     <aside class="side-panel side-panel-left">
       ${miniCalendarHtml()}
       ${weatherWidgetHtml()}
+      ${musicMiniWidgetHtml()}
     </aside>
     <aside class="side-panel side-panel-right paper-card p-4" style="background:#faf7ef;">
       <h4 class="font-hand text-lg mb-3" style="color:var(--text)">바로가기</h4>
@@ -2011,6 +2019,13 @@ function renderShell(innerHtml){
       const target = btn.getAttribute('data-side-nav');
       if(target === 'write'){ beginWrite(); }
       else { nav(target); }
+    });
+  });
+  app.querySelectorAll('[data-open-music-widget]').forEach(el => {
+    const openMusic = () => nav('music');
+    el.addEventListener('click', openMusic);
+    el.addEventListener('keydown', e => {
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openMusic(); }
     });
   });
   wireMiniCalendar();
@@ -2194,6 +2209,7 @@ function renderApp(){
   if(state.view === 'list') return renderList();
   if(state.view === 'calendar') return renderCalendarPage();
   if(state.view === 'fortune') return renderFortunePage();
+  if(state.view === 'music') return renderMusicPage();
   if(state.view === 'detail') return renderDetail();
   if(state.view === 'stats') return renderStats();
   if(state.view === 'travelmap') return renderTravelMap();
@@ -2263,6 +2279,62 @@ function wireMiniCalendar(){
     state.homeCalCursor = new Date(c.getFullYear(), c.getMonth()+1, 1);
     renderApp();
   });
+}
+
+
+/* ---------------- 사이드바: 오늘의 노래 미니 위젯 ---------------- */
+function musicMiniWidgetHtml(){
+  const date = todayStr();
+  const list = getMusicList(date);
+  const first = list[0];
+  return `
+    <div class="music-mini-widget paper-card p-3" role="button" tabindex="0" aria-label="오늘의 노래 열기" data-open-music-widget>
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <div class="flex items-center gap-1.5 min-w-0">
+          <span class="text-sm">🎵</span>
+          <h3 class="text-sm font-semibold truncate" style="color:var(--text)">오늘의 노래</h3>
+        </div>
+        <span class="text-[10px] px-2 py-0.5 rounded-full" style="background:var(--bg-soft);color:var(--text-muted)">${list.length}곡</span>
+      </div>
+      ${first ? `
+        <div class="music-mini-row">
+          <img src="${youtubeThumb(first.videoId)}" alt="" class="music-mini-thumb"> 
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-semibold truncate" style="color:var(--text)">${escapeHtml(first.title)}</p>
+            <p class="text-[10px] truncate" style="color:var(--text-muted)">${escapeHtml(first.artist || 'YouTube')}</p>
+          </div>
+          <span class="text-xs" style="color:var(--text-muted)">▶</span>
+        </div>
+        ${list.length>1 ? `<p class="text-[10px] mt-2" style="color:var(--text-muted)">외 ${list.length-1}곡 더 있어요</p>` : ''}
+      ` : `
+        <p class="text-[11px] leading-relaxed" style="color:var(--text-muted)">오늘의 노래를 아직 넣지 않았어요.<br>눌러서 플레이리스트를 만들어보세요.</p>
+      `}
+    </div>`;
+}
+
+/* ---------------- 오늘의 노래 페이지 ---------------- */
+function renderMusicPage(){
+  state.musicDate = state.musicDate || todayStr();
+  const date = state.musicDate;
+  const list = getMusicList(date);
+  const [y,m,d] = date.split('-').map(Number);
+  const isToday = date === todayStr();
+
+  const html = `
+    <section class="fade-in pb-10">
+      <div class="flex items-end justify-between gap-4 mb-5">
+        <div>
+          <p class="text-xs mb-1" style="color:var(--text-muted)">${isToday ? 'TODAY' : 'PLAYLIST'}</p>
+          <h1 class="font-semibold text-3xl sm:text-4xl" style="color:var(--text)">오늘의 노래 🎵</h1>
+          <p class="text-sm mt-2" style="color:var(--text-muted)">날짜별로 내가 듣고 싶은 노래를 모아두는 공간이에요.</p>
+        </div>
+      </div>
+      ${musicCardHtml(date)}
+    </section>`;
+
+  renderShell(html);
+  wireMusicCard(date);
+
 }
 
 /* ---------------- 홈 대시보드: 날씨 위젯 ---------------- */
@@ -2531,11 +2603,8 @@ function renderHome(){
         `}
       </div>
 
-      ${musicCardHtml(state.musicDate || today)}
-
   `;
   renderShell(html);
-  wireMusicCard(state.musicDate || today);
 
   // 이벤트 바인딩
   const fortuneForm = document.getElementById('fortune-form');
