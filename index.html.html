@@ -696,6 +696,106 @@ const DB = (() => {
     const { error } = await sbClient.from(TRAVEL_TABLE).delete().eq('id', id);
     if(error) throw error;
   }
+
+  const MUSIC_TABLE = 'music';
+  function musicToRow(track, userId, date, sortOrder){
+    return {
+      id: track.id,
+      user_id: userId,
+      music_date: date,
+      video_id: track.videoId,
+      title: track.title || '',
+      artist: track.artist || '',
+      sort_order: Number.isFinite(sortOrder) ? sortOrder : 0,
+      created_at: track.createdAt || new Date().toISOString(),
+    };
+  }
+  function rowToMusic(r){
+    return {
+      id: r.id,
+      date: r.music_date,
+      videoId: r.video_id,
+      title: r.title || '',
+      artist: r.artist || '',
+      sortOrder: Number.isFinite(r.sort_order) ? r.sort_order : 0,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    };
+  }
+  async function fetchMusic(userId){
+    const { data, error } = await sbClient
+      .from(MUSIC_TABLE)
+      .select('*')
+      .eq('user_id', userId)
+      .order('music_date', { ascending:false })
+      .order('sort_order', { ascending:true });
+    if(error) throw error;
+    const map = {};
+    (data||[]).forEach(row => {
+      const key = row.music_date;
+      if(!map[key]) map[key] = [];
+      map[key].push(rowToMusic(row));
+    });
+    return map;
+  }
+  async function insertMusic(track, userId, date, sortOrder){
+    const row = musicToRow(track, userId, date, sortOrder);
+    const { data, error } = await sbClient.from(MUSIC_TABLE).insert(row).select().single();
+    if(error) throw error;
+    return rowToMusic(data);
+  }
+  async function deleteMusic(id, userId){
+    const { error } = await sbClient.from(MUSIC_TABLE).delete().eq('id', id).eq('user_id', userId);
+    if(error) throw error;
+  }
+  async function updateMusicOrder(userId, date, list){
+    if(!list.length) return;
+    for(let index=0; index<list.length; index++){
+      const track = list[index];
+      const { error } = await sbClient
+        .from(MUSIC_TABLE)
+        .update({ sort_order:index, music_date:date })
+        .eq('id', track.id)
+        .eq('user_id', userId);
+      if(error) throw error;
+    }
+  }
+  async function migrateLocalMusic(userId){
+    const storageKey = 'our_archive_music_v1_' + userId;
+    let parsed = null;
+    try{
+      const raw = localStorage.getItem(storageKey);
+      parsed = raw ? JSON.parse(raw) : null;
+    }catch(e){}
+    if(!parsed || typeof parsed !== 'object') return false;
+
+    let migrated = false;
+    for(const [date, list] of Object.entries(parsed)){
+      if(!Array.isArray(list)) continue;
+      for(let i=0;i<list.length;i++){
+        const track = list[i];
+        if(!track || !track.videoId || !track.title) continue;
+        try{
+          const { data: existing, error: checkError } = await sbClient
+            .from(MUSIC_TABLE)
+            .select('id')
+            .eq('user_id', userId)
+            .eq('music_date', date)
+            .eq('video_id', track.videoId)
+            .maybeSingle();
+          if(checkError) throw checkError;
+          if(!existing){
+            await insertMusic(track, userId, date, i);
+            migrated = true;
+          }
+        }catch(err){
+          console.error('local music migration failed:', err);
+        }
+      }
+    }
+    try{ localStorage.removeItem(storageKey); }catch(e){}
+    return migrated;
+  }
   
   return {
     getSession, signUp, signIn, signOut,
@@ -704,6 +804,7 @@ const DB = (() => {
     getFortuneInput, saveFortuneInput,
     fetchTodos, saveTodo,
     fetchTravelPins, insertTravelPin, updateTravelPin, deleteTravelPin,
+    fetchMusic, insertMusic, deleteMusic, updateMusicOrder, migrateLocalMusic,
   };
 })();
 
@@ -714,22 +815,14 @@ const DB = (() => {
    음원 파일을 업로드하지 않고 YouTube 영상의 video ID만 저장한다.
    날짜별 플레이리스트는 현재 로그인한 계정의 브라우저 localStorage에 저장한다.
    ============================================================ */
-const MUSIC_STORAGE_PREFIX = 'our_archive_music_v1_';
-
-function musicStorageKey(){
-  return MUSIC_STORAGE_PREFIX + (state.userId || 'guest');
-}
+/* ============================================================
+   오늘의 노래 · Supabase 플레이리스트
+   ------------------------------------------------------------
+   음악 데이터는 music 테이블에 저장한다.
+   state.musicPlaylists = { 'YYYY-MM-DD': [track, ...] }
+   ============================================================ */
 function getMusicPlaylists(){
-  try{
-    const raw = localStorage.getItem(musicStorageKey());
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  }catch(e){
-    return {};
-  }
-}
-function saveMusicPlaylists(playlists){
-  localStorage.setItem(musicStorageKey(), JSON.stringify(playlists));
+  return state.musicPlaylists && typeof state.musicPlaylists === 'object' ? state.musicPlaylists : {};
 }
 function getMusicList(date){
   const playlists = getMusicPlaylists();
@@ -739,7 +832,7 @@ function setMusicList(date, list){
   const playlists = getMusicPlaylists();
   if(list && list.length) playlists[date] = list;
   else delete playlists[date];
-  saveMusicPlaylists(playlists);
+  state.musicPlaylists = playlists;
 }
 function extractYoutubeVideoId(url){
   const value = (url || '').trim();
@@ -747,9 +840,7 @@ function extractYoutubeVideoId(url){
   try{
     const u = new URL(value);
     const host = u.hostname.replace(/^www\./,'').toLowerCase();
-    if(host === 'youtu.be'){
-      return u.pathname.split('/').filter(Boolean)[0] || null;
-    }
+    if(host === 'youtu.be') return u.pathname.split('/').filter(Boolean)[0] || null;
     if(host === 'youtube.com' || host === 'm.youtube.com'){
       if(u.pathname === '/watch') return u.searchParams.get('v');
       const parts = u.pathname.split('/').filter(Boolean);
@@ -831,7 +922,7 @@ function musicCardHtml(date){
       <div class="music-management">
         <div class="flex items-center justify-between gap-2 mb-3">
           <p class="text-sm font-semibold" style="color:var(--text)">플레이리스트 관리</p>
-          <span class="text-[11px]" style="color:var(--text-muted)">날짜별 저장</span>
+          <span class="text-[11px]" style="color:var(--text-muted)">Supabase 저장</span>
         </div>
 
         <div class="music-date-nav mb-3">
@@ -851,12 +942,14 @@ function musicCardHtml(date){
 
         ${list.length ? `
           <div class="mt-4 pt-3" style="border-top:1px solid var(--border-soft);">
-            <p class="text-xs mb-2" style="color:var(--text-muted)">등록된 곡을 눌러 재생하거나 삭제할 수 있어요.</p>
+            <p class="text-xs mb-2" style="color:var(--text-muted)">등록된 곡의 순서를 바꾸거나 삭제할 수 있어요.</p>
             <div class="space-y-1">
               ${list.map((track,i)=>`
                 <div class="flex items-center gap-2 py-1.5">
                   <span class="text-xs w-5 text-center" style="color:var(--text-muted)">${i+1}</span>
                   <span class="text-xs flex-1 truncate" style="color:var(--text)">${escapeHtml(track.title)}</span>
+                  <button type="button" class="text-xs px-2 py-1 rounded-full" data-music-up="${i}" ${i===0?'disabled':''} style="color:var(--text-muted);background:var(--bg-soft);">↑</button>
+                  <button type="button" class="text-xs px-2 py-1 rounded-full" data-music-down="${i}" ${i===list.length-1?'disabled':''} style="color:var(--text-muted);background:var(--bg-soft);">↓</button>
                   <button type="button" class="text-xs px-2 py-1 rounded-full" data-music-delete="${i}" style="color:var(--accent-red);background:rgba(255,139,139,.1);">삭제</button>
                 </div>
               `).join('')}
@@ -885,7 +978,6 @@ function shiftMusicDate(delta){
 }
 function wireMusicCard(date){
   document.getElementById('music-date')?.addEventListener('change', e => changeMusicDate(e.target.value));
-
   document.getElementById('music-date-prev')?.addEventListener('click', () => shiftMusicDate(-1));
   document.getElementById('music-date-next')?.addEventListener('click', () => shiftMusicDate(1));
 
@@ -909,7 +1001,6 @@ function wireMusicCard(date){
     state.musicSelectedIndex = Math.min(list.length-1, (state.musicSelectedIndex||0)+1);
     renderMusicPage();
   });
-
   document.getElementById('music-play')?.addEventListener('click', () => {
     const frame = document.getElementById('music-youtube-frame');
     if(!frame) return;
@@ -918,6 +1009,29 @@ function wireMusicCard(date){
       url.searchParams.set('autoplay','1');
       frame.src = url.toString();
     }catch(e){}
+  });
+
+  document.querySelectorAll('[data-music-up],[data-music-down]').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation();
+      if(!state.userId) return;
+      const index = Number(btn.getAttribute('data-music-up') ?? btn.getAttribute('data-music-down'));
+      const direction = btn.hasAttribute('data-music-up') ? -1 : 1;
+      const list = getMusicList(date).slice();
+      const targetIndex = index + direction;
+      if(index < 0 || index >= list.length || targetIndex < 0 || targetIndex >= list.length) return;
+      [list[index], list[targetIndex]] = [list[targetIndex], list[index]];
+      setMusicList(date, list);
+      try{
+        await DB.updateMusicOrder(state.userId, date, list);
+        state.musicSelectedIndex = targetIndex;
+        showToast('플레이리스트 순서를 저장했어요');
+        renderMusicPage();
+      }catch(err){
+        console.error(err);
+        showToast('순서 저장에 실패했어요. Supabase 설정을 확인해주세요.');
+      }
+    });
   });
 
   document.querySelectorAll('[data-music-delete]').forEach(btn => {
@@ -932,48 +1046,47 @@ function wireMusicCard(date){
         body:`"${track.title}"을(를) 이 날짜의 플레이리스트에서 삭제해요.`,
         confirmLabel:'삭제하기',
         danger:true,
-        onConfirm: () => {
-          const next = getMusicList(date).filter((_,i)=>i!==index);
-          setMusicList(date, next);
-          state.musicSelectedIndex = Math.min(state.musicSelectedIndex||0, Math.max(next.length-1,0));
-          showToast('노래를 삭제했어요');
-          renderMusicPage();
+        onConfirm: async () => {
+          try{
+            await DB.deleteMusic(track.id, state.userId);
+            const next = list.filter((_,i)=>i!==index);
+            setMusicList(date, next);
+            state.musicSelectedIndex = Math.min(state.musicSelectedIndex||0, Math.max(next.length-1,0));
+            showToast('노래를 삭제했어요');
+            renderMusicPage();
+          }catch(err){
+            console.error(err);
+            showToast('노래 삭제에 실패했어요.');
+          }
         }
       });
     });
   });
 
-  document.getElementById('music-add-form')?.addEventListener('submit', e => {
+  document.getElementById('music-add-form')?.addEventListener('submit', async e => {
     e.preventDefault();
+    if(!state.userId){ showToast('로그인 후 노래를 저장할 수 있어요.'); return; }
     const url = document.getElementById('music-url').value.trim();
     const title = document.getElementById('music-title').value.trim();
     const artist = document.getElementById('music-artist').value.trim();
     const videoId = extractYoutubeVideoId(url);
-    if(!videoId){
-      showToast('올바른 YouTube 링크를 입력해주세요.');
-      return;
+    if(!videoId){ showToast('올바른 YouTube 링크를 입력해주세요.'); return; }
+    if(!title){ showToast('곡 제목을 입력해주세요.'); return; }
+    const list = getMusicList(date).slice();
+    if(list.some(x=>x.videoId===videoId)){ showToast('이미 이 날짜에 등록된 곡이에요.'); return; }
+
+    const draftTrack = { id:newId(), date, videoId, title, artist, createdAt:new Date().toISOString() };
+    try{
+      const saved = await DB.insertMusic(draftTrack, state.userId, date, list.length);
+      list.push(saved);
+      setMusicList(date, list);
+      state.musicSelectedIndex = list.length-1;
+      showToast('오늘의 노래에 저장했어요 🎵');
+      renderMusicPage();
+    }catch(err){
+      console.error(err);
+      showToast('노래 저장에 실패했어요. Supabase music 테이블/RLS를 확인해주세요.');
     }
-    if(!title){
-      showToast('곡 제목을 입력해주세요.');
-      return;
-    }
-    const list = getMusicList(date);
-    if(list.some(x=>x.videoId===videoId)){
-      showToast('이미 이 날짜에 등록된 곡이에요.');
-      return;
-    }
-    list.push({
-      id:newId(),
-      date,
-      videoId,
-      title,
-      artist,
-      createdAt:new Date().toISOString()
-    });
-    setMusicList(date, list);
-    state.musicSelectedIndex = list.length-1;
-    showToast('오늘의 노래에 추가했어요 🎵');
-    renderMusicPage();
   });
 }
 
@@ -1851,6 +1964,7 @@ const state = {
   travelSearchResults: [],
   travelDateFilter: '',
   travelDraft: null,
+  musicPlaylists: {},
   musicDate: todayStr(),
   musicSelectedIndex: 0,
   quoteTimer: null,
@@ -2111,10 +2225,11 @@ async function afterAuth(user){
     state.todos = {};
   }
   try{
-    state.travelPins = await DB.fetchTravelPins(user.id);
+    await DB.migrateLocalMusic(user.id);
+    state.musicPlaylists = await DB.fetchMusic(user.id);
   }catch(err){
-    console.error('travel pins fetch failed (travel_pins 테이블이 아직 없을 수 있어요):', err);
-    state.travelPins = [];
+    console.error('music fetch/migration failed (music 테이블 또는 RLS를 확인하세요):', err);
+    state.musicPlaylists = {};
   }
   state.booting = false;
   state.view = 'home';
