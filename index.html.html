@@ -970,23 +970,25 @@ function toggleMusicPlayback(date, index){
   });
 }
 
-function playPreviousMusicTrack(){
-  const date = state.musicPlaybackDate;
-  if(!date) return;
+function playPreviousMusicTrack(dateArg = null, indexArg = null){
+  const date = dateArg || state.musicPlaybackDate || todayStr();
   const list = getMusicList(date);
   if(!list.length) return;
-  const previous = (state.musicPlaybackIndex - 1 + list.length) % list.length;
+  const baseIndex = Number.isInteger(indexArg) ? indexArg : (state.musicPlaybackDate === date ? Number(state.musicPlaybackIndex) : 0);
+  const currentIndex = Number.isFinite(baseIndex) ? baseIndex : 0;
+  const previous = ((currentIndex - 1) + list.length) % list.length;
   playMusicTrack(date, previous);
   if(state.view === 'music') renderMusicPage();
   else renderApp();
 }
 
-function playNextMusicTrack(){
-  const date = state.musicPlaybackDate;
-  if(!date) return;
+function playNextMusicTrack(dateArg = null, indexArg = null){
+  const date = dateArg || state.musicPlaybackDate || todayStr();
   const list = getMusicList(date);
   if(!list.length) return;
-  const next = (state.musicPlaybackIndex + 1) % list.length;
+  const baseIndex = Number.isInteger(indexArg) ? indexArg : (state.musicPlaybackDate === date ? Number(state.musicPlaybackIndex) : 0);
+  const currentIndex = Number.isFinite(baseIndex) ? baseIndex : 0;
+  const next = (currentIndex + 1) % list.length;
   playMusicTrack(date, next);
   if(state.view === 'music') renderMusicPage();
   else renderApp();
@@ -2328,19 +2330,23 @@ function renderShell(innerHtml){
     btn.addEventListener('click', e => {
       e.preventDefault();
       e.stopPropagation();
-      playPreviousMusicTrack();
+      const date = btn.getAttribute('data-music-date') || todayStr();
+      const index = Number(btn.getAttribute('data-music-index'));
+      playPreviousMusicTrack(date, Number.isFinite(index) ? index : 0);
     });
   });
   app.querySelectorAll('[data-music-mini-next]').forEach(btn => {
     btn.addEventListener('click', e => {
       e.preventDefault();
       e.stopPropagation();
-      playNextMusicTrack();
+      const date = btn.getAttribute('data-music-date') || todayStr();
+      const index = Number(btn.getAttribute('data-music-index'));
+      playNextMusicTrack(date, Number.isFinite(index) ? index : 0);
     });
   });
   app.querySelectorAll('[data-open-music-widget]').forEach(el => {
     const openMusic = (e) => {
-      if(e && e.target.closest('[data-music-mini-play]')) return;
+      if(e && e.target.closest('[data-music-mini-play], [data-music-mini-prev], [data-music-mini-next]')) return;
       nav('music');
     };
     el.addEventListener('click', openMusic);
@@ -2635,9 +2641,9 @@ function musicMiniWidgetHtml(){
           </div>
         </div>
         <div class="music-mini-controls" aria-label="오늘의 노래 재생 컨트롤">
-          <button type="button" class="music-mini-nav" data-music-mini-prev data-music-date="${date}" data-music-index="${index}" aria-label="이전 곡" ${index<=0?'disabled':''}>◀</button>
+          <button type="button" class="music-mini-nav" data-music-mini-prev data-music-date="${date}" data-music-index="${index}" aria-label="이전 곡" ${list.length<=1?'disabled':''}>◀</button>
           <button type="button" class="music-mini-nav music-mini-nav-main" data-music-mini-play data-music-date="${date}" data-music-index="${index}" aria-label="${isPlaying?'일시정지':'재생'}">${isPlaying?'❚❚':'▶'}</button>
-          <button type="button" class="music-mini-nav" data-music-mini-next data-music-date="${date}" data-music-index="${index}" aria-label="다음 곡" ${index>=list.length-1?'disabled':''}>▶</button>
+          <button type="button" class="music-mini-nav" data-music-mini-next data-music-date="${date}" data-music-index="${index}" aria-label="다음 곡" ${list.length<=1?'disabled':''}>▶</button>
         </div>
         ${list.length>1 ? `<p class="text-[10px] mt-2 text-center" style="color:var(--text-muted)">${index+1} / ${list.length}</p>` : ''}
       ` : `
