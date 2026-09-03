@@ -2437,6 +2437,12 @@ async function afterAuth(user){
     state.todos = {};
   }
   try{
+    state.travelPins = await DB.fetchTravelPins(user.id);
+  }catch(err){
+    console.error('travel pins fetch failed (travel_pins 테이블 또는 RLS를 확인하세요):', err);
+    state.travelPins = [];
+  }
+  try{
     await DB.migrateLocalMusic(user.id);
     state.musicPlaylists = await DB.fetchMusic(user.id);
   }catch(err){
