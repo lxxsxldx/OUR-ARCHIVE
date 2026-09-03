@@ -391,6 +391,11 @@ kbd{
 .music-mini-thumb{width:48px;height:34px;flex:0 0 48px;border-radius:7px;object-fit:cover;border:1px solid var(--border-soft);background:var(--bg-soft);}
 .music-mini-play{width:30px;height:30px;flex:0 0 30px;border-radius:50%;border:1px solid var(--border);background:var(--surface);display:grid;place-items:center;font-size:11px;color:var(--text);}
 .music-mini-play:hover{background:var(--bg-soft);}
+.music-mini-nav-btn{width:25px;height:25px;flex:0 0 25px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--text);display:grid;place-items:center;font-size:10px;padding:0;}
+.music-mini-nav-btn:hover{background:var(--bg-soft);}
+.music-mini-nav-btn:disabled{opacity:.35;cursor:not-allowed;}
+.music-meta-status{font-size:.68rem;color:var(--text-muted);min-height:1em;margin-top:4px;}
+.music-meta-loading{opacity:.7;}
 #global-music-player-shell{position:fixed;left:-10000px;top:0;width:320px;height:180px;overflow:hidden;pointer-events:none;z-index:35;border-radius:18px;background:#000;box-shadow:0 1px 8px rgba(0,0,0,.08);}
 #global-music-player-shell.is-visible{pointer-events:auto;}
 #global-music-youtube{width:100%;height:100%;}
@@ -863,6 +868,57 @@ function extractYoutubeVideoId(url){
   const match = value.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([A-Za-z0-9_-]{6,})/);
   return match ? match[1] : null;
 }
+
+let musicMetadataRequestId = 0;
+async function fetchYoutubeMetadata(url){
+  const videoId = extractYoutubeVideoId(url);
+  if(!videoId) throw new Error('올바른 YouTube 링크가 아니에요.');
+  const canonicalUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+  const endpoint = `https://www.youtube.com/oembed?url=${encodeURIComponent(canonicalUrl)}&format=json`;
+  const res = await fetch(endpoint, { method:'GET' });
+  if(!res.ok) throw new Error('YouTube 정보를 가져오지 못했어요.');
+  const data = await res.json();
+  return {
+    videoId,
+    title: (data.title || '').trim(),
+    artist: (data.author_name || '').trim(),
+    thumbnail: data.thumbnail_url || youtubeThumb(videoId),
+  };
+}
+
+async function autoFillYoutubeMetadata({silent=false}={}){
+  const urlInput = document.getElementById('music-url');
+  const titleInput = document.getElementById('music-title');
+  const artistInput = document.getElementById('music-artist');
+  const status = document.getElementById('music-meta-status');
+  if(!urlInput || !titleInput || !artistInput) return null;
+  const url = urlInput.value.trim();
+  const requestId = ++musicMetadataRequestId;
+  if(!url){
+    if(status) status.textContent = '';
+    return null;
+  }
+  const videoId = extractYoutubeVideoId(url);
+  if(!videoId){
+    if(status) status.textContent = silent ? '' : 'YouTube 링크를 확인해주세요.';
+    return null;
+  }
+  if(status){ status.textContent = 'YouTube 정보를 가져오는 중…'; status.classList.add('music-meta-loading'); }
+  try{
+    const meta = await fetchYoutubeMetadata(url);
+    if(requestId !== musicMetadataRequestId) return null;
+    if(!titleInput.value.trim()) titleInput.value = meta.title;
+    if(!artistInput.value.trim()) artistInput.value = meta.artist;
+    if(status) status.textContent = '제목과 채널 정보를 자동으로 입력했어요.';
+    return meta;
+  }catch(err){
+    console.warn('YouTube metadata fetch failed:', err);
+    if(status) status.textContent = silent ? '' : '자동 정보를 가져오지 못했어요. 직접 입력할 수 있어요.';
+    return null;
+  }finally{
+    if(status) status.classList.remove('music-meta-loading');
+  }
+}
 function youtubeThumb(videoId){
   return `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg`;
 }
@@ -946,6 +1002,16 @@ function playNextMusicTrack(){
   if(state.view === 'music') renderMusicPage();
 }
 
+function playPrevMusicTrack(){
+  const date = state.musicPlaybackDate;
+  if(!date) return;
+  const list = getMusicList(date);
+  if(!list.length) return;
+  const prev = (state.musicPlaybackIndex - 1 + list.length) % list.length;
+  playMusicTrack(date, prev);
+  renderApp();
+}
+
 function syncMusicPlayerPosition(){
   const shell = document.getElementById('global-music-player-shell');
   const anchor = document.getElementById('music-player-anchor');
@@ -988,6 +1054,16 @@ function syncMusicPlaybackUi(){
     const active = state.musicPlaybackDate === date && state.musicPlaybackIndex === index && playing;
     btn.textContent = active ? '❚❚' : '▶';
     btn.setAttribute('aria-label', active ? '일시정지' : '재생');
+  });
+  document.querySelectorAll('[data-music-mini-prev]').forEach(btn => {
+    const date = btn.getAttribute('data-music-date');
+    const list = getMusicList(date);
+    btn.disabled = list.length <= 1;
+  });
+  document.querySelectorAll('[data-music-mini-next]').forEach(btn => {
+    const date = btn.getAttribute('data-music-date');
+    const list = getMusicList(date);
+    btn.disabled = list.length <= 1;
   });
   scheduleMusicPlayerPosition();
 }
@@ -1059,10 +1135,11 @@ function musicCardHtml(date){
         </div>
 
         <form id="music-add-form" class="space-y-2">
-          <input id="music-url" type="url" class="music-input" placeholder="YouTube URL을 붙여넣어 주세요" required>
+          <input id="music-url" type="url" class="music-input" placeholder="YouTube URL만 붙여넣어 주세요" required>
+          <div id="music-meta-status" class="music-meta-status"></div>
           <div class="grid grid-cols-2 gap-2">
-            <input id="music-title" type="text" class="music-input" placeholder="곡 제목" required>
-            <input id="music-artist" type="text" class="music-input" placeholder="가수 / 아티스트">
+            <input id="music-title" type="text" class="music-input" placeholder="곡 제목 (자동 입력)" required>
+            <input id="music-artist" type="text" class="music-input" placeholder="가수 / 채널 (자동 입력)">
           </div>
           <button type="submit" class="btn-primary w-full !py-2.5 text-sm">＋ 이 날짜에 곡 추가하기</button>
         </form>
@@ -1188,15 +1265,29 @@ function wireMusicCard(date){
     });
   });
 
+  const musicUrlInput = document.getElementById('music-url');
+  musicUrlInput?.addEventListener('paste', () => {
+    setTimeout(() => autoFillYoutubeMetadata({silent:false}), 0);
+  });
+  musicUrlInput?.addEventListener('change', () => autoFillYoutubeMetadata({silent:false}));
+  musicUrlInput?.addEventListener('blur', () => autoFillYoutubeMetadata({silent:false}));
+
   document.getElementById('music-add-form')?.addEventListener('submit', async e => {
     e.preventDefault();
     if(!state.userId){ showToast('로그인 후 노래를 저장할 수 있어요.'); return; }
     const url = document.getElementById('music-url').value.trim();
-    const title = document.getElementById('music-title').value.trim();
-    const artist = document.getElementById('music-artist').value.trim();
+    let title = document.getElementById('music-title').value.trim();
+    let artist = document.getElementById('music-artist').value.trim();
     const videoId = extractYoutubeVideoId(url);
     if(!videoId){ showToast('올바른 YouTube 링크를 입력해주세요.'); return; }
-    if(!title){ showToast('곡 제목을 입력해주세요.'); return; }
+    if(!title || !artist){
+      const meta = await autoFillYoutubeMetadata({silent:false});
+      title = document.getElementById('music-title').value.trim();
+      artist = document.getElementById('music-artist').value.trim();
+      if(!title && meta?.title) title = meta.title;
+      if(!artist && meta?.artist) artist = meta.artist;
+    }
+    if(!title){ showToast('YouTube에서 제목을 가져오지 못했어요. 제목을 입력해주세요.'); return; }
     const list = getMusicList(date).slice();
     if(list.some(x=>x.videoId===videoId)){ showToast('이미 이 날짜에 등록된 곡이에요.'); return; }
 
@@ -2267,9 +2358,35 @@ function renderShell(innerHtml){
       toggleMusicPlayback(date, index);
     });
   });
+  app.querySelectorAll('[data-music-mini-prev]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const date = btn.getAttribute('data-music-date') || todayStr();
+      const list = getMusicList(date);
+      if(list.length <= 1) return;
+      const currentIndex = (state.musicPlaybackDate === date) ? state.musicPlaybackIndex : 0;
+      const prevIndex = (currentIndex - 1 + list.length) % list.length;
+      playMusicTrack(date, prevIndex);
+      renderApp();
+    });
+  });
+  app.querySelectorAll('[data-music-mini-next]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const date = btn.getAttribute('data-music-date') || todayStr();
+      const list = getMusicList(date);
+      if(list.length <= 1) return;
+      const currentIndex = (state.musicPlaybackDate === date) ? state.musicPlaybackIndex : 0;
+      const nextIndex = (currentIndex + 1) % list.length;
+      playMusicTrack(date, nextIndex);
+      renderApp();
+    });
+  });
   app.querySelectorAll('[data-open-music-widget]').forEach(el => {
     const openMusic = (e) => {
-      if(e && e.target.closest('[data-music-mini-play]')) return;
+      if(e && e.target.closest('[data-music-mini-play],[data-music-mini-prev],[data-music-mini-next]')) return;
       nav('music');
     };
     el.addEventListener('click', openMusic);
@@ -2551,14 +2668,16 @@ function musicMiniWidgetHtml(){
       </div>
       ${first ? `
         <div class="music-mini-row">
+          <button type="button" class="music-mini-nav-btn" data-music-mini-prev data-music-date="${date}" aria-label="이전 곡" ${list.length<=1?'disabled':''}>◀</button>
           <img src="${youtubeThumb(first.videoId)}" alt="" class="music-mini-thumb"> 
           <div class="min-w-0 flex-1">
             <p class="text-xs font-semibold truncate" style="color:var(--text)">${escapeHtml(first.title)}</p>
             <p class="text-[10px] truncate" style="color:var(--text-muted)">${escapeHtml(first.artist || 'YouTube')}</p>
           </div>
           <button type="button" class="music-mini-play" data-music-mini-play data-music-date="${date}" data-music-index="${index}" aria-label="${isPlaying?'일시정지':'재생'}">${isPlaying?'❚❚':'▶'}</button>
+          <button type="button" class="music-mini-nav-btn" data-music-mini-next data-music-date="${date}" aria-label="다음 곡" ${list.length<=1?'disabled':''}>▶</button>
         </div>
-        ${list.length>1 ? `<p class="text-[10px] mt-2" style="color:var(--text-muted)">외 ${list.length-1}곡 더 있어요</p>` : ''}
+        ${list.length>1 ? `<p class="text-[10px] mt-2" style="color:var(--text-muted)">${index+1} / ${list.length}곡</p>` : ''}
       ` : `
         <p class="text-[11px] leading-relaxed" style="color:var(--text-muted)">오늘의 노래를 아직 넣지 않았어요.<br>눌러서 플레이리스트를 만들어보세요.</p>
       `}
