@@ -384,6 +384,43 @@ kbd{
 @media(max-width:640px){ #travel-map{ height:340px; } }
   
 
+
+/* ---- 건강 루틴(약/운동) ---- */
+.routine-row{
+  display:flex;align-items:center;gap:10px;padding:9px 10px;
+  border-radius:14px;background:rgba(255,255,255,.42);
+  border:1px solid transparent;transition:.15s ease;
+}
+.routine-row:hover{border-color:var(--border);background:var(--surface);}
+.routine-toggle{
+  width:42px;height:42px;flex:0 0 42px;border-radius:14px;
+  border:1px solid var(--border);background:var(--surface);
+  display:grid;place-items:center;font-size:1.35rem;cursor:pointer;
+  transition:.15s ease;
+}
+.routine-toggle:hover{transform:scale(1.04);}
+.routine-toggle.done{background:#e5f1e9;border-color:#8fbea1;box-shadow:inset 0 0 0 2px rgba(88,145,108,.08);}
+.routine-type-pill{
+  font-size:.62rem;padding:2px 7px;border-radius:999px;
+  background:var(--bg-soft);color:var(--text-muted);
+}
+.routine-delete{font-size:.75rem;color:var(--text-muted);padding:4px 6px;}
+.routine-delete:hover{color:var(--accent-red);}
+.routine-add-grid{display:grid;grid-template-columns:105px 1fr 72px auto;gap:7px;align-items:center;}
+.routine-add-grid input,.routine-add-grid select{
+  min-width:0;padding:.55rem .7rem;border-radius:11px;
+  background:var(--bg-soft);border:1px solid var(--border-soft);color:var(--text);font-size:.78rem;
+}
+.routine-mini-item{display:flex;align-items:center;gap:7px;font-size:.72rem;}
+.routine-mini-item button{width:24px;height:24px;border-radius:8px;border:1px solid var(--border);background:var(--surface);display:grid;place-items:center;font-size:.85rem;}
+.routine-mini-item button.done{background:#e5f1e9;border-color:#8fbea1;}
+@media(max-width:640px){
+  .routine-add-grid{grid-template-columns:1fr 1fr;}
+  .routine-add-grid select{grid-column:1;}
+  .routine-add-grid input:nth-of-type(1){grid-column:2;}
+  .routine-add-grid input:nth-of-type(2){grid-column:1;}
+}
+
 .music-mini-widget{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease;background:#faf7ef;}
 .music-mini-widget:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm);}
 .music-mini-widget:focus-visible{outline:2px solid var(--text);outline-offset:2px;}
@@ -673,45 +710,7 @@ const DB = (() => {
       if(error) throw error;
     }
   }
-  
-  const MEDS_TABLE = 'medicines';
-  async function fetchMedicines(userId){
-    const { data, error } = await sbClient.from(MEDS_TABLE).select('date, content').eq('user_id', userId);
-    if(error) throw error;
-    const map = {};
-    (data||[]).forEach(row => { if(row.content) map[row.date] = parseTodoContent(row.content); });
-    return map;
-  }
-  async function saveMedicine(userId, date, text){
-    if(text && text.trim()){
-      const { error } = await sbClient.from(MEDS_TABLE)
-        .upsert({ user_id: userId, date, content: text, updated_at: new Date().toISOString() }, { onConflict: 'user_id,date' });
-      if(error) throw error;
-    } else {
-      const { error } = await sbClient.from(MEDS_TABLE).delete().eq('user_id', userId).eq('date', date);
-      if(error) throw error;
-    }
-  }
 
-  const EXERCISE_TABLE = 'exercises';
-  async function fetchExercises(userId){
-    const { data, error } = await sbClient.from(EXERCISE_TABLE).select('date, content').eq('user_id', userId);
-    if(error) throw error;
-    const map = {};
-    (data||[]).forEach(row => { if(row.content) map[row.date] = parseTodoContent(row.content); });
-    return map;
-  }
-  async function saveExercise(userId, date, text){
-    if(text && text.trim()){
-      const { error } = await sbClient.from(EXERCISE_TABLE)
-        .upsert({ user_id: userId, date, content: text, updated_at: new Date().toISOString() }, { onConflict: 'user_id,date' });
-      if(error) throw error;
-    } else {
-      const { error } = await sbClient.from(EXERCISE_TABLE).delete().eq('user_id', userId).eq('date', date);
-      if(error) throw error;
-    }
-  }
-  
   const TRAVEL_TABLE = 'travel_pins';
   function pinToRow(p, userId){
     return {
@@ -853,12 +852,90 @@ const DB = (() => {
     return migrated;
   }
   
+
+  const ROUTINES_TABLE = 'routines';
+  const ROUTINE_LOGS_TABLE = 'routine_logs';
+
+  function rowToRoutine(r){
+    return {
+      id:r.id,
+      type:r.type === 'exercise' ? 'exercise' : 'medicine',
+      name:r.name || '',
+      emoji:r.emoji || (r.type === 'exercise' ? '🏃' : '💊'),
+      active:r.active !== false,
+      sortOrder:Number.isFinite(r.sort_order) ? r.sort_order : 0,
+      createdAt:r.created_at,
+    };
+  }
+
+  async function fetchRoutines(userId){
+    const { data, error } = await sbClient
+      .from(ROUTINES_TABLE)
+      .select('*')
+      .eq('user_id', userId)
+      .order('sort_order', {ascending:true})
+      .order('created_at', {ascending:true});
+    if(error) throw error;
+    return (data||[]).map(rowToRoutine);
+  }
+
+  async function insertRoutine(routine, userId){
+    const row = {
+      id: routine.id || newId(),
+      user_id:userId,
+      type:routine.type === 'exercise' ? 'exercise' : 'medicine',
+      name:routine.name || '',
+      emoji:routine.emoji || (routine.type === 'exercise' ? '🏃' : '💊'),
+      active:true,
+      sort_order:Number.isFinite(routine.sortOrder) ? routine.sortOrder : 0,
+    };
+    const { data, error } = await sbClient.from(ROUTINES_TABLE).insert(row).select().single();
+    if(error) throw error;
+    return rowToRoutine(data);
+  }
+
+  async function deleteRoutine(id, userId){
+    const { error } = await sbClient
+      .from(ROUTINES_TABLE).delete().eq('id', id).eq('user_id', userId);
+    if(error) throw error;
+  }
+
+  async function fetchRoutineLogs(userId){
+    const { data, error } = await sbClient
+      .from(ROUTINE_LOGS_TABLE)
+      .select('routine_id, date, done')
+      .eq('user_id', userId);
+    if(error) throw error;
+    const map = {};
+    (data||[]).forEach(row => {
+      if(!row.done) return;
+      if(!map[row.date]) map[row.date] = {};
+      map[row.date][row.routine_id] = true;
+    });
+    return map;
+  }
+
+  async function saveRoutineLog(userId, routineId, date, done){
+    if(done){
+      const { error } = await sbClient.from(ROUTINE_LOGS_TABLE).upsert({
+        user_id:userId, routine_id:routineId, date, done:true,
+        updated_at:new Date().toISOString()
+      }, {onConflict:'user_id,routine_id,date'});
+      if(error) throw error;
+    }else{
+      const { error } = await sbClient.from(ROUTINE_LOGS_TABLE)
+        .delete().eq('user_id',userId).eq('routine_id',routineId).eq('date',date);
+      if(error) throw error;
+    }
+  }
+
   return {
     getSession, signUp, signIn, signOut,
     fetchEntries, insertEntry, updateEntry, deleteEntry,
     getDraft, saveDraft, clearDraft, getTheme, setTheme,
     getFortuneInput, saveFortuneInput,
     fetchTodos, saveTodo,
+    fetchRoutines, insertRoutine, deleteRoutine, fetchRoutineLogs, saveRoutineLog,
     fetchTravelPins, insertTravelPin, updateTravelPin, deleteTravelPin,
     fetchMusic, insertMusic, deleteMusic, updateMusicOrder, migrateLocalMusic,
   };
@@ -2178,8 +2255,8 @@ const state = {
   homeCalCursor: new Date(),
   homeAnchorDate: todayStr(),
   todos: {},
-  medicines: {},
-  exercises: {},
+  routines: [],
+  routineLogs: {},
   weatherData: null,
   weatherLoading: false,
   weatherError: null,
@@ -2254,6 +2331,181 @@ const NAV_ITEMS = [
 ];
 
 /* ---------------- 고정 사이드 패널 (넓은 화면 여백 활용) ---------------- */
+
+/* ============================================================
+   건강 루틴 · 약/운동
+   ============================================================ */
+function getRoutines(type){
+  return (state.routines || []).filter(r => r.active !== false && (!type || r.type === type));
+}
+
+function isRoutineDone(date, routineId){
+  return !!(state.routineLogs && state.routineLogs[date] && state.routineLogs[date][routineId]);
+}
+
+function routineIconHtml(routine, date){
+  const done = isRoutineDone(date, routine.id);
+  return `<button type="button" class="routine-toggle ${done?'done':''}"
+    data-routine-toggle="${routine.id}" data-routine-date="${date}"
+    title="${escapeHtml(routine.name)} ${done?'완료됨':'미완료'}">${escapeHtml(routine.emoji)}</button>`;
+}
+
+function routineRowHtml(routine, date, showDelete=false){
+  const done = isRoutineDone(date, routine.id);
+  return `
+    <div class="routine-row">
+      ${routineIconHtml(routine,date)}
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-semibold truncate" style="color:var(--text)">${escapeHtml(routine.name)}</span>
+          <span class="routine-type-pill">${routine.type==='medicine'?'약':'운동'}</span>
+        </div>
+        <p class="text-[11px] mt-0.5" style="color:${done?'#5d956e':'var(--text-muted)'}">${done?'오늘 완료했어요 ✓':'아이콘을 눌러 완료 표시'}</p>
+      </div>
+      ${showDelete ? `<button type="button" class="routine-delete" data-routine-delete="${routine.id}" title="이 루틴 삭제">✕</button>` : ''}
+    </div>`;
+}
+
+function routineMiniHtml(date){
+  const routines = getRoutines();
+  if(!routines.length) return `<p class="text-xs" style="color:var(--text-muted)">등록된 약/운동이 없어요.</p>`;
+  return routines.map(r => {
+    const done = isRoutineDone(date,r.id);
+    return `<div class="routine-mini-item">
+      <button type="button" class="${done?'done':''}" data-routine-toggle="${r.id}" data-routine-date="${date}" title="${escapeHtml(r.name)}">${escapeHtml(r.emoji)}</button>
+      <span style="color:${done?'var(--text-muted)':'var(--text)'};${done?'text-decoration:line-through;':''}">${escapeHtml(r.name)}</span>
+    </div>`;
+  }).join('');
+}
+
+async function toggleRoutine(date, routineId){
+  const done = !isRoutineDone(date, routineId);
+  state.routineLogs[date] = state.routineLogs[date] || {};
+  if(done) state.routineLogs[date][routineId] = true;
+  else delete state.routineLogs[date][routineId];
+  if(!Object.keys(state.routineLogs[date]).length) delete state.routineLogs[date];
+
+  try{
+    await DB.saveRoutineLog(state.userId, routineId, date, done);
+    showToast(done ? '기록했어요 ✓' : '완료 표시를 취소했어요');
+    renderApp();
+  }catch(err){
+    console.error(err);
+    // 실패 시 UI 상태 되돌리기
+    state.routineLogs[date] = state.routineLogs[date] || {};
+    if(done) delete state.routineLogs[date][routineId];
+    else state.routineLogs[date][routineId] = true;
+    if(!Object.keys(state.routineLogs[date]).length) delete state.routineLogs[date];
+    showToast('건강 기록 저장에 실패했어요: ' + (err && err.message ? err.message : '알 수 없는 오류'));
+  }
+}
+
+function routineManagerHtml(date){
+  const medicines = getRoutines('medicine');
+  const exercises = getRoutines('exercise');
+  return `
+    <div class="paper-card p-5 mb-5">
+      <div class="flex items-center justify-between gap-2 mb-4">
+        <div>
+          <h4 class="font-semibold" style="color:var(--text)">건강 루틴</h4>
+          <p class="text-xs mt-1" style="color:var(--text-muted)">💊 약과 🏃 운동을 기록해두고, 아이콘을 눌러 매일 완료 표시하세요.</p>
+        </div>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4 mb-5">
+        <div>
+          <p class="text-xs font-semibold mb-2" style="color:var(--text-muted)">💊 약</p>
+          <div class="space-y-2">
+            ${medicines.length ? medicines.map(r=>routineRowHtml(r,date,true)).join('') : `<p class="text-xs" style="color:var(--text-muted)">등록된 약이 없어요.</p>`}
+          </div>
+        </div>
+        <div>
+          <p class="text-xs font-semibold mb-2" style="color:var(--text-muted)">🏃 운동</p>
+          <div class="space-y-2">
+            ${exercises.length ? exercises.map(r=>routineRowHtml(r,date,true)).join('') : `<p class="text-xs" style="color:var(--text-muted)">등록된 운동이 없어요.</p>`}
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-4" style="border-top:1px solid var(--border-soft)">
+        <p class="text-xs font-semibold mb-2" style="color:var(--text)">약/운동 추가</p>
+        <div class="routine-add-grid">
+          <select id="routine-type">
+            <option value="medicine">💊 약</option>
+            <option value="exercise">🏃 운동</option>
+          </select>
+          <input id="routine-name" type="text" placeholder="예: 비타민D / 러닝" maxlength="50" />
+          <input id="routine-emoji" type="text" placeholder="💊" maxlength="4" />
+          <button type="button" id="routine-add-btn" class="btn-primary !py-2 !px-3 text-xs">추가</button>
+        </div>
+        <p class="text-[11px] mt-2" style="color:var(--text-muted)">이 목록은 매일 표시되며, 완료 기록은 날짜별로 Supabase에 영구 저장됩니다.</p>
+      </div>
+    </div>`;
+}
+
+function wireRoutineWidgets(){
+  document.querySelectorAll('[data-routine-toggle]').forEach(btn => {
+    btn.addEventListener('click', () => toggleRoutine(
+      btn.getAttribute('data-routine-date'),
+      btn.getAttribute('data-routine-toggle')
+    ));
+  });
+
+  document.querySelectorAll('[data-routine-delete]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-routine-delete');
+      const routine = (state.routines||[]).find(r=>r.id===id);
+      if(!routine) return;
+      showModal({
+        title:`${routine.name}을(를) 삭제할까요?`,
+        body:'삭제하면 앞으로의 루틴 목록에서 사라지고, 이 루틴의 완료 기록도 함께 삭제됩니다.',
+        confirmLabel:'삭제하기',
+        danger:true,
+        onConfirm: async () => {
+          try{
+            await DB.deleteRoutine(id,state.userId);
+            state.routines = state.routines.filter(r=>r.id!==id);
+            Object.keys(state.routineLogs||{}).forEach(date => {
+              if(state.routineLogs[date]) delete state.routineLogs[date][id];
+              if(!Object.keys(state.routineLogs[date]||{}).length) delete state.routineLogs[date];
+            });
+            showToast('루틴을 삭제했어요');
+            renderApp();
+          }catch(err){
+            console.error(err);
+            showToast('삭제에 실패했어요: ' + (err && err.message ? err.message : '알 수 없는 오류'));
+          }
+        }
+      });
+    });
+  });
+
+  const addBtn = document.getElementById('routine-add-btn');
+  if(addBtn){
+    addBtn.addEventListener('click', async () => {
+      const type = document.getElementById('routine-type').value;
+      const name = document.getElementById('routine-name').value.trim();
+      const emojiInput = document.getElementById('routine-emoji').value.trim();
+      if(!name){ showToast(type==='medicine'?'약 이름을 입력해주세요 💊':'운동 종류를 입력해주세요 🏃'); return; }
+      const emoji = emojiInput || (type==='medicine'?'💊':'🏃');
+      addBtn.disabled=true; addBtn.textContent='저장…';
+      try{
+        const saved = await DB.insertRoutine({
+          id:newId(), type, name, emoji,
+          sortOrder:(state.routines||[]).length
+        }, state.userId);
+        state.routines.push(saved);
+        showToast(`${type==='medicine'?'약':'운동'}을 추가했어요`);
+        renderApp();
+      }catch(err){
+        console.error(err);
+        addBtn.disabled=false; addBtn.textContent='추가';
+        showToast('추가에 실패했어요: ' + (err && err.message ? err.message : '알 수 없는 오류'));
+      }
+    });
+  }
+}
+
 function sidePanelsHtml(){
   return `
     <aside class="side-panel side-panel-left">
@@ -2273,6 +2525,13 @@ function sidePanelsHtml(){
       <div class="double-divider my-4"></div>
       <div class="space-y-3">
         ${todoWidgetsHtml()}
+        <div class="paper-card p-4" style="background:#faf7ef;">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-semibold" style="color:var(--text)">건강 루틴</span>
+            <button type="button" data-side-nav="calendar" class="text-[11px]" style="color:var(--text-muted)">관리 →</button>
+          </div>
+          <div class="space-y-1.5">${routineMiniHtml(state.homeAnchorDate || todayStr())}</div>
+        </div>
       </div>
     </aside>
   `;
@@ -2483,16 +2742,12 @@ async function afterAuth(user){
     state.todos = {};
   }
   try{
-    state.medicines = await DB.fetchMedicines(user.id);
+    state.routines = await DB.fetchRoutines(user.id);
+    state.routineLogs = await DB.fetchRoutineLogs(user.id);
   }catch(err){
-    console.error('medicines fetch failed (medicines 테이블이 아직 없을 수 있어요):', err);
-    state.medicines = {};
-  }
-  try{
-    state.exercises = await DB.fetchExercises(user.id);
-  }catch(err){
-    console.error('exercises fetch failed (exercises 테이블이 아직 없을 수 있어요):', err);
-    state.exercises = {};
+    console.error('routine fetch failed (routines/routine_logs 테이블 또는 RLS를 확인하세요):', err);
+    state.routines = [];
+    state.routineLogs = {};
   }
   try{
     state.travelPins = await DB.fetchTravelPins(user.id);
@@ -2623,10 +2878,11 @@ function miniCalendarHtml(){
     const isAnchor = dateStr === state.homeAnchorDate;
     const hasEntry = !!entryDates[dateStr];
     const hasTodo = !!(state.todos && state.todos[dateStr] && state.todos[dateStr].length);
+    const hasRoutine = !!(state.routineLogs && state.routineLogs[dateStr] && Object.keys(state.routineLogs[dateStr]).length);
     cells += `
       <button type="button" class="mini-cal-cell ${isToday?'mini-today':''} ${isAnchor?'mini-selected':''}" data-mini-date="${dateStr}">
         <span>${day}</span>
-        <span class="mini-cal-dots">${hasEntry?'<i class="dot dot-entry"></i>':''}${hasTodo?'<i class="dot dot-todo"></i>':''}</span>
+        <span class="mini-cal-dots">${hasEntry?'<i class="dot dot-entry"></i>':''}${hasTodo?'<i class="dot dot-todo"></i>':''}${hasRoutine?'<i class="dot" style="background:#8fbea1;"></i>':''}</span>
       </button>`;
   }
 
@@ -2793,62 +3049,6 @@ function weatherWidgetHtml(){
 }
 
 /* ---------------- 홈 대시보드: 할 일 메모 위젯 (어제/오늘/내일) ---------------- */
-function medicineItemHtml(date, item){
-  return `
-    <div class="flex items-start gap-1.5" data-med-item-date="${date}">
-      <button type="button" data-med-toggle="${item.id}" title="${item.taken ? '복용 완료' : '복용 전'}"
-        style="width:22px;height:22px;flex-shrink:0;margin-top:1px;border-radius:50%;border:1.5px solid ${item.taken?'var(--brand-mint)':'var(--border)'};
-        background:${item.taken?'var(--brand-mint)':'transparent'};font-size:.85rem;display:flex;align-items:center;justify-content:center;">💊</button>
-      <textarea rows="1" class="med-item-text flex-1 text-xs bg-transparent" data-med-text="${item.id}"
-        style="color:${item.taken?'var(--text-muted)':'var(--text)'};text-decoration:${item.taken?'line-through':'none'};border:none;outline:none;resize:none;overflow:hidden;white-space:pre-wrap;word-break:break-word;line-height:1.4;padding:2px 0;">${escapeHtml(item.text)}</textarea>
-      <button type="button" class="text-xs" data-med-del="${item.id}" style="color:var(--text-muted);flex-shrink:0;margin-top:2px;">✕</button>
-    </div>`;
-}
-function exerciseItemHtml(date, item){
-  return `
-    <div class="flex items-start gap-1.5" data-ex-item-date="${date}">
-      <button type="button" data-ex-toggle="${item.id}" title="${item.done ? '운동 완료' : '운동 전'}"
-        style="width:22px;height:22px;flex-shrink:0;margin-top:1px;border-radius:50%;border:1.5px solid ${item.done?'var(--accent-pink)':'var(--border)'};
-        background:${item.done?'var(--accent-pink)':'transparent'};font-size:.85rem;display:flex;align-items:center;justify-content:center;">🏃</button>
-      <textarea rows="1" class="ex-item-text flex-1 text-xs bg-transparent" data-ex-text="${item.id}"
-        style="color:${item.done?'var(--text-muted)':'var(--text)'};text-decoration:${item.done?'line-through':'none'};border:none;outline:none;resize:none;overflow:hidden;white-space:pre-wrap;word-break:break-word;line-height:1.4;padding:2px 0;">${escapeHtml(item.text)}</textarea>
-      <button type="button" class="text-xs" data-ex-del="${item.id}" style="color:var(--text-muted);flex-shrink:0;margin-top:2px;">✕</button>
-    </div>`;
-}
-function medicineWidgetHtml(date){
-  const items = (state.medicines && state.medicines[date]) || [];
-  return `
-    <div class="paper-card p-5">
-      <div class="flex items-center justify-between mb-3">
-        <h4 class="font-semibold" style="color:var(--text)">💊 복약 기록</h4>
-        <span class="text-xs" style="color:var(--text-muted)">약 이름을 적고 💊를 눌러 복용 표시</span>
-      </div>
-      <div class="space-y-1.5 mb-3" data-med-list="${date}">
-        ${items.length ? items.map(it=>medicineItemHtml(date,it)).join('') : `<p class="text-xs" style="color:var(--text-muted)">등록된 약이 없어요.</p>`}
-      </div>
-      <div class="flex gap-2">
-        <input type="text" class="med-new-input flex-1 text-sm px-3 py-2 rounded-xl" data-med-new="${date}" placeholder="약 이름을 입력해주세요" style="background:var(--bg-soft); border:1px solid var(--border-soft); color:var(--text);" />
-        <button type="button" class="text-sm px-4 py-2 rounded-xl font-semibold" data-med-add="${date}" style="background:var(--text); color:var(--bg);">추가</button>
-      </div>
-    </div>`;
-}
-function exerciseWidgetHtml(date){
-  const items = (state.exercises && state.exercises[date]) || [];
-  return `
-    <div class="paper-card p-5">
-      <div class="flex items-center justify-between mb-3">
-        <h4 class="font-semibold" style="color:var(--text)">🏃 운동 기록</h4>
-        <span class="text-xs" style="color:var(--text-muted)">운동 종목을 적고 🏃를 눌러 완료 표시</span>
-      </div>
-      <div class="space-y-1.5 mb-3" data-ex-list="${date}">
-        ${items.length ? items.map(it=>exerciseItemHtml(date,it)).join('') : `<p class="text-xs" style="color:var(--text-muted)">등록된 운동이 없어요.</p>`}
-      </div>
-      <div class="flex gap-2">
-        <input type="text" class="ex-new-input flex-1 text-sm px-3 py-2 rounded-xl" data-ex-new="${date}" placeholder="운동 종목을 입력해주세요" style="background:var(--bg-soft); border:1px solid var(--border-soft); color:var(--text);" />
-        <button type="button" class="text-sm px-4 py-2 rounded-xl font-semibold" data-ex-add="${date}" style="background:var(--text); color:var(--bg);">추가</button>
-      </div>
-    </div>`;
-}
 function todoItemHtml(date, item){
   const s = TODO_STATUS[item.status] || TODO_STATUS.progress;
   return `
@@ -2892,128 +3092,7 @@ function todoWidgetsHtml(){
       </div>`;
   }).join('');
 }
-async function persistMedicineList(date, items){
-  try{
-    await DB.saveMedicine(state.userId, date, serializeTodoContent(items));
-    if(items.length){ state.medicines[date] = items; } else { delete state.medicines[date]; }
-  }catch(err){
-    console.error(err);
-    showToast('복약 기록 저장에 실패했어요: ' + (err && err.message ? err.message : '알 수 없는 오류'));
-  }
-}
-async function persistExerciseList(date, items){
-  try{
-    await DB.saveExercise(state.userId, date, serializeTodoContent(items));
-    if(items.length){ state.exercises[date] = items; } else { delete state.exercises[date]; }
-  }catch(err){
-    console.error(err);
-    showToast('운동 기록 저장에 실패했어요: ' + (err && err.message ? err.message : '알 수 없는 오류'));
-  }
-}
 
-function wireHealthWidgets(){
-  document.querySelectorAll('[data-med-toggle]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-med-toggle');
-      const date = btn.closest('[data-med-item-date]')?.getAttribute('data-med-item-date');
-      const items = (state.medicines[date] || []).slice();
-      const item = items.find(i => i.id === id);
-      if(!item) return;
-      item.taken = !item.taken;
-      state.medicines[date] = items;
-      await persistMedicineList(date, items);
-      renderApp();
-    });
-  });
-  document.querySelectorAll('.med-item-text').forEach(input => {
-    autoResizeTextarea(input);
-    const doSave = debounce(async (id, value) => {
-      const date = input.closest('[data-med-item-date]')?.getAttribute('data-med-item-date');
-      const items = state.medicines[date] || [];
-      const item = items.find(i => i.id === id);
-      if(!item) return;
-      item.text = value;
-      await persistMedicineList(date, items);
-    }, 600);
-    input.addEventListener('input', (e) => { autoResizeTextarea(input); doSave(input.getAttribute('data-med-text'), e.target.value); });
-  });
-  document.querySelectorAll('[data-med-del]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-med-del');
-      const date = btn.closest('[data-med-item-date]')?.getAttribute('data-med-item-date');
-      const items = (state.medicines[date] || []).filter(i => i.id !== id);
-      state.medicines[date] = items;
-      await persistMedicineList(date, items);
-      renderApp();
-    });
-  });
-  function addMedItem(date){
-    const input = document.querySelector(`[data-med-new="${date}"]`);
-    if(!input) return;
-    const text = input.value.trim();
-    if(!text) return;
-    const items = (state.medicines[date] || []).slice();
-    items.push({ id:newId(), text, taken:false });
-    state.medicines[date] = items;
-    input.value = '';
-    persistMedicineList(date, items).then(() => renderApp());
-  }
-  document.querySelectorAll('[data-med-add]').forEach(btn => btn.addEventListener('click', () => addMedItem(btn.getAttribute('data-med-add'))));
-  document.querySelectorAll('.med-new-input').forEach(input => {
-    input.addEventListener('keydown', (e) => { if(e.key === 'Enter'){ e.preventDefault(); addMedItem(input.getAttribute('data-med-new')); } });
-  });
-
-  document.querySelectorAll('[data-ex-toggle]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-ex-toggle');
-      const date = btn.closest('[data-ex-item-date]')?.getAttribute('data-ex-item-date');
-      const items = (state.exercises[date] || []).slice();
-      const item = items.find(i => i.id === id);
-      if(!item) return;
-      item.done = !item.done;
-      state.exercises[date] = items;
-      await persistExerciseList(date, items);
-      renderApp();
-    });
-  });
-  document.querySelectorAll('.ex-item-text').forEach(input => {
-    autoResizeTextarea(input);
-    const doSave = debounce(async (id, value) => {
-      const date = input.closest('[data-ex-item-date]')?.getAttribute('data-ex-item-date');
-      const items = state.exercises[date] || [];
-      const item = items.find(i => i.id === id);
-      if(!item) return;
-      item.text = value;
-      await persistExerciseList(date, items);
-    }, 600);
-    input.addEventListener('input', (e) => { autoResizeTextarea(input); doSave(input.getAttribute('data-ex-text'), e.target.value); });
-  });
-  document.querySelectorAll('[data-ex-del]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-ex-del');
-      const date = btn.closest('[data-ex-item-date]')?.getAttribute('data-ex-item-date');
-      const items = (state.exercises[date] || []).filter(i => i.id !== id);
-      state.exercises[date] = items;
-      await persistExerciseList(date, items);
-      renderApp();
-    });
-  });
-  function addExItem(date){
-    const input = document.querySelector(`[data-ex-new="${date}"]`);
-    if(!input) return;
-    const text = input.value.trim();
-    if(!text) return;
-    const items = (state.exercises[date] || []).slice();
-    items.push({ id:newId(), text, done:false });
-    state.exercises[date] = items;
-    input.value = '';
-    persistExerciseList(date, items).then(() => renderApp());
-  }
-  document.querySelectorAll('[data-ex-add]').forEach(btn => btn.addEventListener('click', () => addExItem(btn.getAttribute('data-ex-add'))));
-  document.querySelectorAll('.ex-new-input').forEach(input => {
-    input.addEventListener('keydown', (e) => { if(e.key === 'Enter'){ e.preventDefault(); addExItem(input.getAttribute('data-ex-new')); } });
-  });
-}
 async function persistTodoList(date, items){
   try{
     await DB.saveTodo(state.userId, date, serializeTodoContent(items));
@@ -4188,7 +4267,7 @@ function renderCalendarPage(){
       <div class="flex items-end justify-between mb-5">
         <div>
           <h1 class="font-hand text-3xl" style="color:var(--text)">캘린더</h1>
-          <p class="text-sm mt-1" style="color:var(--text-muted)">날짜를 눌러 그날의 일기와 할 일을 기록해보세요.</p>
+          <p class="text-sm mt-1" style="color:var(--text-muted)">날짜를 눌러 일기·할 일·약·운동을 한곳에서 기록해보세요.</p>
         </div>
       </div>
       <div id="calendar-wrap"></div>
@@ -4216,11 +4295,14 @@ function renderCalendar(){
     const isToday = dateStr === todayStr();
     const isSelected = dateStr === state.calendarSelectedDate;
     const dominant = dayEntries[0] ? moodOf(dayEntries[0].mood) : null;
+    const routineDone = !!(state.routineLogs && state.routineLogs[dateStr] && Object.keys(state.routineLogs[dateStr]).length);
+    const routineMarks = routineDone ? `<span style="font-size:.62rem;">💊🏃</span>` : '';
     cells += `
       <div class="cal-cell ${isToday?'today':''} ${dayEntries.length?'has-entry':''} ${isSelected?'selected':''}" data-date="${dateStr}"
         style="background:${dayEntries.length ? (dominant?dominant.color:'var(--bg-soft)') : 'transparent'}; color:${dayEntries.length ? 'var(--text)':'var(--text-muted)'};">
         <span style="font-size:.85rem;">${day}</span>
         ${dayEntries.length ? `<span style="font-size:.7rem;">${dominant?dominant.emoji:''}</span>` : ''}
+        ${routineMarks}
       </div>`;
   }
 
@@ -4239,6 +4321,7 @@ function renderCalendar(){
       <div class="grid grid-cols-7 gap-1.5">${cells}</div>
       <div class="flex flex-wrap gap-3 mt-4 pt-4 text-xs" style="border-top:1px solid var(--border-soft); color:var(--text-muted);">
         ${MOODS.map(m=>`<span class="flex items-center gap-1"><span style="width:9px;height:9px;border-radius:999px;background:${m.color};display:inline-block;"></span>${m.label}</span>`).join('')}
+        <span>💊🏃 건강 루틴 완료</span>
       </div>
     </div>
     <div id="cal-day-detail">
@@ -4256,7 +4339,8 @@ function renderCalendar(){
           </div>
           ${selectedEntries.length ? `<div class="grid sm:grid-cols-2 gap-3">${selectedEntries.map(e=>entryCardHtml(e)).join('')}</div>` : `<p class="text-sm" style="color:var(--text-muted)">이 날에는 아직 일기가 없어요.</p>`}
         </div>
-        <div class="paper-card p-5">
+
+        <div class="paper-card p-5 mb-5">
           <div class="flex items-center justify-between mb-3">
             <h4 class="font-semibold" style="color:var(--text)">할 일</h4>
             <span class="text-xs" style="color:var(--text-muted)">진행중 △ · 완료 ○ · 실패 ✕</span>
@@ -4268,10 +4352,9 @@ function renderCalendar(){
             <input type="text" class="todo-new-input flex-1 text-sm px-3 py-2 rounded-xl" data-todo-new="${state.calendarSelectedDate}" placeholder="할 일을 입력해주세요" style="background:var(--bg-soft); border:1px solid var(--border-soft); color:var(--text);" />
             <button type="button" class="text-sm px-4 py-2 rounded-xl font-semibold" data-todo-add="${state.calendarSelectedDate}" style="background:var(--text); color:var(--bg);">추가</button>
           </div>
-        <div class="grid sm:grid-cols-2 gap-5 mt-5">
-          ${medicineWidgetHtml(state.calendarSelectedDate)}
-          ${exerciseWidgetHtml(state.calendarSelectedDate)}
         </div>
+
+        ${routineManagerHtml(state.calendarSelectedDate)}
       ` : `<p class="text-sm" style="color:var(--text-muted)">날짜를 선택해 그날의 기록을 확인하고 추가해보세요.</p>`}
     </div>
   `;
@@ -4287,7 +4370,7 @@ function renderCalendar(){
     document.querySelector(`[data-todo-new="${state.calendarSelectedDate}"]`)?.focus();
   });
   wireTodoWidgets();
-  wireHealthWidgets();
+  wireRoutineWidgets();
   document.getElementById('cal-prev').addEventListener('click', () => { state.calendarCursor = new Date(year, month-1, 1); renderCalendar(); });
   document.getElementById('cal-next').addEventListener('click', () => { state.calendarCursor = new Date(year, month+1, 1); renderCalendar(); });
 }
