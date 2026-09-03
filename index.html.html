@@ -391,11 +391,6 @@ kbd{
 .music-mini-thumb{width:48px;height:34px;flex:0 0 48px;border-radius:7px;object-fit:cover;border:1px solid var(--border-soft);background:var(--bg-soft);}
 .music-mini-play{width:30px;height:30px;flex:0 0 30px;border-radius:50%;border:1px solid var(--border);background:var(--surface);display:grid;place-items:center;font-size:11px;color:var(--text);}
 .music-mini-play:hover{background:var(--bg-soft);}
-.music-mini-controls{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:9px;padding-top:8px;border-top:1px solid var(--border-soft);}
-.music-mini-nav{width:27px;height:27px;flex:0 0 27px;border-radius:50%;border:1px solid var(--border);background:var(--surface);display:grid;place-items:center;font-size:10px;color:var(--text);}
-.music-mini-nav:hover{background:var(--bg-soft);}
-.music-mini-nav:disabled{opacity:.38;cursor:not-allowed;}
-.music-mini-nav-main{width:34px;height:34px;flex-basis:34px;font-size:12px;background:var(--text);color:var(--bg);border-color:var(--text);}
 #global-music-player-shell{position:fixed;left:-10000px;top:0;width:320px;height:180px;overflow:hidden;pointer-events:none;z-index:35;border-radius:18px;background:#000;box-shadow:0 1px 8px rgba(0,0,0,.08);}
 #global-music-player-shell.is-visible{pointer-events:auto;}
 #global-music-youtube{width:100%;height:100%;}
@@ -876,35 +871,6 @@ function youtubeEmbed(videoId, autoplay=false){
   return `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?${params}`;
 }
 
-async function fetchYoutubeOEmbed(videoId){
-  const endpoint = `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}&format=json`;
-  const response = await fetch(endpoint, { headers:{Accept:'application/json'} });
-  if(!response.ok) throw new Error('YouTube metadata fetch failed');
-  return await response.json();
-}
-
-async function autoFillMusicMetadata(){
-  const urlInput = document.getElementById('music-url');
-  const titleInput = document.getElementById('music-title');
-  const artistInput = document.getElementById('music-artist');
-  const button = document.getElementById('music-fetch-info');
-  if(!urlInput || !titleInput || !artistInput) return;
-  const videoId = extractYoutubeVideoId(urlInput.value);
-  if(!videoId){ showToast('먼저 올바른 YouTube 링크를 붙여넣어 주세요.'); return; }
-  if(button){ button.disabled=true; button.textContent='가져오는 중…'; }
-  try{
-    const meta = await fetchYoutubeOEmbed(videoId);
-    if(!titleInput.value.trim() && meta.title) titleInput.value = meta.title;
-    if(!artistInput.value.trim() && meta.author_name) artistInput.value = meta.author_name;
-    showToast('YouTube 정보를 자동으로 입력했어요 🎵');
-  }catch(err){
-    console.error(err);
-    showToast('YouTube 정보를 자동으로 가져오지 못했어요. 직접 입력해주세요.');
-  }finally{
-    if(button){ button.disabled=false; button.textContent='🔍 정보 자동입력'; }
-  }
-}
-
 /* 전역 YouTube 플레이어: 화면 렌더링과 분리해 페이지 이동 중에도 재생을 유지한다. */
 let globalMusicPlayer = null;
 let globalMusicPlayerReady = false;
@@ -970,17 +936,6 @@ function toggleMusicPlayback(date, index){
   });
 }
 
-function playPreviousMusicTrack(){
-  const date = state.musicPlaybackDate;
-  if(!date) return;
-  const list = getMusicList(date);
-  if(!list.length) return;
-  const previous = (state.musicPlaybackIndex - 1 + list.length) % list.length;
-  playMusicTrack(date, previous);
-  if(state.view === 'music') renderMusicPage();
-  else renderApp();
-}
-
 function playNextMusicTrack(){
   const date = state.musicPlaybackDate;
   if(!date) return;
@@ -989,7 +944,6 @@ function playNextMusicTrack(){
   const next = (state.musicPlaybackIndex + 1) % list.length;
   playMusicTrack(date, next);
   if(state.view === 'music') renderMusicPage();
-  else renderApp();
 }
 
 function syncMusicPlayerPosition(){
@@ -1105,10 +1059,7 @@ function musicCardHtml(date){
         </div>
 
         <form id="music-add-form" class="space-y-2">
-          <div class="flex gap-2">
-            <input id="music-url" type="url" class="music-input" placeholder="YouTube URL을 붙여넣어 주세요" required>
-            <button type="button" id="music-fetch-info" class="btn-ghost text-xs !px-3 !py-2 shrink-0">🔍 정보 자동입력</button>
-          </div>
+          <input id="music-url" type="url" class="music-input" placeholder="YouTube URL을 붙여넣어 주세요" required>
           <div class="grid grid-cols-2 gap-2">
             <input id="music-title" type="text" class="music-input" placeholder="곡 제목" required>
             <input id="music-artist" type="text" class="music-input" placeholder="가수 / 아티스트">
@@ -1235,14 +1186,6 @@ function wireMusicCard(date){
         }
       });
     });
-  });
-
-  document.getElementById('music-fetch-info')?.addEventListener('click', autoFillMusicMetadata);
-  document.getElementById('music-url')?.addEventListener('blur', () => {
-    const url = document.getElementById('music-url')?.value.trim();
-    const title = document.getElementById('music-title')?.value.trim();
-    const artist = document.getElementById('music-artist')?.value.trim();
-    if(url && !title && !artist) autoFillMusicMetadata();
   });
 
   document.getElementById('music-add-form')?.addEventListener('submit', async e => {
@@ -2324,20 +2267,6 @@ function renderShell(innerHtml){
       toggleMusicPlayback(date, index);
     });
   });
-  app.querySelectorAll('[data-music-mini-prev]').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      playPreviousMusicTrack();
-    });
-  });
-  app.querySelectorAll('[data-music-mini-next]').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      playNextMusicTrack();
-    });
-  });
   app.querySelectorAll('[data-open-music-widget]').forEach(el => {
     const openMusic = (e) => {
       if(e && e.target.closest('[data-music-mini-play]')) return;
@@ -2443,6 +2372,17 @@ async function afterAuth(user){
     console.error('music fetch/migration failed (music 테이블 또는 RLS를 확인하세요):', err);
     state.musicPlaylists = {};
   }
+
+  // 여행 지도 기록도 로그인 직후 Supabase에서 반드시 불러온다.
+  // 기존 코드에서는 fetchTravelPins가 정의되어 있었지만 afterAuth에서 호출하지 않아
+  // DB에는 기록이 있어도 state.travelPins가 빈 배열로 남아 지도/목록에 표시되지 않았다.
+  try{
+    state.travelPins = await DB.fetchTravelPins(user.id);
+  }catch(err){
+    console.error('travel pins fetch failed (travel_pins 테이블 또는 RLS를 확인하세요):', err);
+    state.travelPins = [];
+  }
+
   state.booting = false;
   state.view = 'home';
   renderApp();
@@ -2627,13 +2567,9 @@ function musicMiniWidgetHtml(){
             <p class="text-xs font-semibold truncate" style="color:var(--text)">${escapeHtml(first.title)}</p>
             <p class="text-[10px] truncate" style="color:var(--text-muted)">${escapeHtml(first.artist || 'YouTube')}</p>
           </div>
+          <button type="button" class="music-mini-play" data-music-mini-play data-music-date="${date}" data-music-index="${index}" aria-label="${isPlaying?'일시정지':'재생'}">${isPlaying?'❚❚':'▶'}</button>
         </div>
-        <div class="music-mini-controls" aria-label="오늘의 노래 재생 컨트롤">
-          <button type="button" class="music-mini-nav" data-music-mini-prev data-music-date="${date}" data-music-index="${index}" aria-label="이전 곡" ${index<=0?'disabled':''}>◀</button>
-          <button type="button" class="music-mini-nav music-mini-nav-main" data-music-mini-play data-music-date="${date}" data-music-index="${index}" aria-label="${isPlaying?'일시정지':'재생'}">${isPlaying?'❚❚':'▶'}</button>
-          <button type="button" class="music-mini-nav" data-music-mini-next data-music-date="${date}" data-music-index="${index}" aria-label="다음 곡" ${index>=list.length-1?'disabled':''}>▶</button>
-        </div>
-        ${list.length>1 ? `<p class="text-[10px] mt-2 text-center" style="color:var(--text-muted)">${index+1} / ${list.length}</p>` : ''}
+        ${list.length>1 ? `<p class="text-[10px] mt-2" style="color:var(--text-muted)">외 ${list.length-1}곡 더 있어요</p>` : ''}
       ` : `
         <p class="text-[11px] leading-relaxed" style="color:var(--text-muted)">오늘의 노래를 아직 넣지 않았어요.<br>눌러서 플레이리스트를 만들어보세요.</p>
       `}
