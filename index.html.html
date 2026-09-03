@@ -443,7 +443,7 @@ kbd{
 .music-player-status{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.88);color:#233432;font-size:22px;box-shadow:0 4px 18px rgba(0,0,0,.18);}
 
 /* ============================================================
-   오늘의 노래 · YouTube 플레이리스트
+   ON AIR · YouTube 플레이리스트
    ============================================================ */
 .music-card{ background:#faf7ef; }
 .music-player{
@@ -943,13 +943,13 @@ const DB = (() => {
 
 
 /* ============================================================
-   오늘의 노래 · YouTube 플레이리스트
+   ON AIR · YouTube 플레이리스트
    ------------------------------------------------------------
    음원 파일을 업로드하지 않고 YouTube 영상의 video ID만 저장한다.
    날짜별 플레이리스트는 현재 로그인한 계정의 브라우저 localStorage에 저장한다.
    ============================================================ */
 /* ============================================================
-   오늘의 노래 · Supabase 플레이리스트
+   ON AIR · Supabase 플레이리스트
    ------------------------------------------------------------
    음악 데이터는 music 테이블에 저장한다.
    state.musicPlaylists = { 'YYYY-MM-DD': [track, ...] }
@@ -1380,7 +1380,7 @@ function wireMusicCard(date){
       list.push(saved);
       setMusicList(date, list);
       state.musicSelectedIndex = list.length-1;
-      showToast('오늘의 노래에 저장했어요 🎵');
+      showToast('ON AIR에 저장했어요 🎵');
       renderMusicPage();
     }catch(err){
       console.error(err);
@@ -2325,7 +2325,7 @@ const NAV_ITEMS = [
   { key:'list',     label:'내 기록', icon:'📔' },
   { key:'calendar', label:'캘린더',   icon:'📅' },
   { key:'travelmap',label:'여행지도', icon:'🗺️' },
-  { key:'music',    label:'오늘의 노래', icon:'🎵' },
+  { key:'music',    label:'ON AIR', icon:'🎵' },
   { key:'stats',    label:'통계',   icon:'📊' },
 ];
 
@@ -2923,7 +2923,7 @@ function wireMiniCalendar(){
 }
 
 
-/* ---------------- 사이드바: 오늘의 노래 미니 위젯 ---------------- */
+/* ---------------- 사이드바: ON AIR 미니 위젯 ---------------- */
 function musicMiniWidgetHtml(){
   const date = todayStr();
   const list = getMusicList(date);
@@ -2932,10 +2932,10 @@ function musicMiniWidgetHtml(){
   const first = list[index];
   const isPlaying = !!(activeToday && state.musicIsPlaying);
   return `
-    <div class="music-mini-widget paper-card p-3" role="button" tabindex="0" aria-label="오늘의 노래 열기" data-open-music-widget>
+    <div class="music-mini-widget paper-card p-3" role="button" tabindex="0" aria-label="ON AIR 열기" data-open-music-widget>
       <div class="flex items-center justify-between gap-2 mb-2">
         <div class="flex items-center gap-1.5 min-w-0">
-          <h3 class="font-hand text-lg mb-3 truncate" style="color:var(--text)">오늘의 노래</h3>
+          <h3 class="font-hand text-lg mb-3 truncate" style="color:var(--text)">ON AIR</h3>
         </div>
         <span class="text-[10px] px-2 py-0.5 rounded-full" style="background:var(--bg-soft);color:var(--text-muted)">${list.length}곡</span>
       </div>
@@ -2947,19 +2947,19 @@ function musicMiniWidgetHtml(){
             <p class="text-[10px] truncate" style="color:var(--text-muted)">${escapeHtml(first.artist || 'YouTube')}</p>
           </div>
         </div>
-        <div class="music-mini-controls" aria-label="오늘의 노래 재생 컨트롤">
+        <div class="music-mini-controls" aria-label="ON AIR 재생 컨트롤">
           <button type="button" class="music-mini-nav" data-music-mini-prev data-music-date="${date}" data-music-index="${index}" aria-label="이전 곡" ${list.length<=1?'disabled':''}>◀</button>
           <button type="button" class="music-mini-nav music-mini-nav-main" data-music-mini-play data-music-date="${date}" data-music-index="${index}" aria-label="${isPlaying?'일시정지':'재생'}">${isPlaying?'❚❚':'▶'}</button>
           <button type="button" class="music-mini-nav" data-music-mini-next data-music-date="${date}" data-music-index="${index}" aria-label="다음 곡" ${list.length<=1?'disabled':''}>▶</button>
         </div>
         ${list.length>1 ? `<p class="text-[10px] mt-2 text-center" style="color:var(--text-muted)">${index+1} / ${list.length}</p>` : ''}
       ` : `
-        <p class="text-[11px] leading-relaxed" style="color:var(--text-muted)">오늘의 노래를 아직 넣지 않았어요.<br>눌러서 플레이리스트를 만들어보세요.</p>
+        <p class="text-[11px] leading-relaxed" style="color:var(--text-muted)">ON AIR를 아직 넣지 않았어요.<br>눌러서 플레이리스트를 만들어보세요.</p>
       `}
     </div>`;
 }
 
-/* ---------------- 오늘의 노래 페이지 ---------------- */
+/* ---------------- ON AIR 페이지 ---------------- */
 function renderMusicPage(){
   state.musicDate = state.musicDate || todayStr();
   const date = state.musicDate;
@@ -2972,7 +2972,7 @@ function renderMusicPage(){
       <div class="flex items-end justify-between gap-4 mb-5">
         <div>
           <p class="text-xs mb-1" style="color:var(--text-muted)">${isToday ? 'TODAY' : 'PLAYLIST'}</p>
-          <h1 class="font-hand text-3xl" style="color:var(--text)">오늘의 노래</h1>
+          <h1 class="font-hand text-3xl" style="color:var(--text)">ON AIR</h1>
           <p class="text-sm mt-2" style="color:var(--text-muted)">날짜별로 내가 듣고 싶은 노래를 모아두는 공간이에요.</p>
         </div>
       </div>
