@@ -13,6 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://www.youtube.com/iframe_api"></script>
 <style>
 :root{
   --bg:#FAF4E6;
@@ -383,25 +384,21 @@ kbd{
 @media(max-width:640px){ #travel-map{ height:340px; } }
   
 
-.music-mini-widget{transition:transform .15s ease,box-shadow .15s ease;background:#faf7ef;}
+.music-mini-widget{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease;background:#faf7ef;}
 .music-mini-widget:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm);}
 .music-mini-widget:focus-visible{outline:2px solid var(--text);outline-offset:2px;}
 .music-mini-row{display:flex;align-items:center;gap:8px;min-width:0;}
 .music-mini-thumb{width:48px;height:34px;flex:0 0 48px;border-radius:7px;object-fit:cover;border:1px solid var(--border-soft);background:var(--bg-soft);}
-.music-mini-controls{display:flex;align-items:center;gap:5px;margin-top:10px;}
-.music-mini-control{width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--text);display:flex;align-items:center;justify-content:center;font-size:11px;transition:.15s ease;}
-.music-mini-control:hover{background:var(--bg-soft);}
-.music-mini-control-main{width:32px;height:32px;background:var(--text);color:var(--bg);border-color:var(--text);}
-.music-mini-title-btn{background:none;border:0;padding:0;cursor:pointer;text-align:left;}
-.music-mini-title-btn:hover{text-decoration:underline;text-decoration-color:var(--brand-pink);text-underline-offset:4px;}
-#persistent-music-layer{
-  position:fixed;inset:0;width:1px;height:1px;z-index:-1;pointer-events:none;opacity:0;
-}
-#persistent-music-layer .persistent-music-iframe{width:1px;height:1px;border:0;display:block;}
-#persistent-music-layer.music-player-visible{
-  position:relative;inset:auto;width:100%;height:100%;z-index:1;pointer-events:auto;opacity:1;
-}
-#persistent-music-layer.music-player-visible .persistent-music-iframe{width:100%;height:100%;}
+.music-mini-play{width:30px;height:30px;flex:0 0 30px;border-radius:50%;border:1px solid var(--border);background:var(--surface);display:grid;place-items:center;font-size:11px;color:var(--text);}
+.music-mini-play:hover{background:var(--bg-soft);}
+#global-music-player-shell{position:fixed;left:-10000px;top:0;width:320px;height:180px;overflow:hidden;pointer-events:none;z-index:35;border-radius:18px;background:#000;box-shadow:0 1px 8px rgba(0,0,0,.08);}
+#global-music-player-shell.is-visible{pointer-events:auto;}
+#global-music-youtube{width:100%;height:100%;}
+#global-music-youtube iframe{width:100%;height:100%;border:0;display:block;}
+.music-player-preview{position:relative;width:100%;height:100%;overflow:hidden;}
+.music-player-preview img{width:100%;height:100%;object-fit:cover;display:block;}
+.music-player-preview::after{content:"";position:absolute;inset:0;background:rgba(0,0,0,.10);pointer-events:none;}
+.music-player-status{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.88);color:#233432;font-size:22px;box-shadow:0 4px 18px rgba(0,0,0,.18);}
 
 /* ============================================================
    오늘의 노래 · YouTube 플레이리스트
@@ -416,6 +413,7 @@ kbd{
   border:1px solid var(--border-soft);
 }
 .music-player iframe{width:100%;height:100%;border:0;display:block;}
+.music-player-anchor{width:100%;height:100%;background:#000;}
 .music-empty{
   min-height:180px;
   display:flex;
@@ -480,9 +478,9 @@ kbd{
 </head>
 <body>
 <div id="app" style="padding-bottom:76px;"></div>
-<div id="persistent-music-layer" aria-hidden="true"></div>
 <div id="toast" class="toast"></div>
 <div id="modal-root"></div>
+<div id="global-music-player-shell" aria-hidden="true"><div id="global-music-youtube"></div></div>
 
 <script>
 /* =========================================================
@@ -759,23 +757,6 @@ const DB = (() => {
     if(error) throw error;
     return rowToMusic(data);
   }
-  async function updateMusic(track, userId){
-    const payload = {
-      video_id: track.videoId,
-      title: track.title || '',
-      artist: track.artist || '',
-      updated_at: new Date().toISOString(),
-    };
-    const { data, error } = await sbClient
-      .from(MUSIC_TABLE)
-      .update(payload)
-      .eq('id', track.id)
-      .eq('user_id', userId)
-      .select()
-      .single();
-    if(error) throw error;
-    return rowToMusic(data);
-  }
   async function deleteMusic(id, userId){
     const { error } = await sbClient.from(MUSIC_TABLE).delete().eq('id', id).eq('user_id', userId);
     if(error) throw error;
@@ -836,7 +817,7 @@ const DB = (() => {
     getFortuneInput, saveFortuneInput,
     fetchTodos, saveTodo,
     fetchTravelPins, insertTravelPin, updateTravelPin, deleteTravelPin,
-    fetchMusic, insertMusic, updateMusic, deleteMusic, updateMusicOrder, migrateLocalMusic,
+    fetchMusic, insertMusic, deleteMusic, updateMusicOrder, migrateLocalMusic,
   };
 })();
 
@@ -853,164 +834,6 @@ const DB = (() => {
    음악 데이터는 music 테이블에 저장한다.
    state.musicPlaylists = { 'YYYY-MM-DD': [track, ...] }
    ============================================================ */
-/* ---------------- 지속형 YouTube 플레이어 ---------------- */
-function loadYouTubeIframeAPI(){
-  if(window.YT && window.YT.Player) return Promise.resolve();
-  if(window.__ourArchiveYTApiPromise) return window.__ourArchiveYTApiPromise;
-  window.__ourArchiveYTApiPromise = new Promise(resolve => {
-    const previous = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      if(typeof previous === 'function') previous();
-      resolve();
-    };
-    const script = document.createElement('script');
-    script.src = 'https://www.youtube.com/iframe_api';
-    script.async = true;
-    document.head.appendChild(script);
-  });
-  return window.__ourArchiveYTApiPromise;
-}
-
-function persistentMusicIframeHtml(videoId=''){
-  const src = videoId
-    ? youtubeEmbed(videoId, false) + '&enablejsapi=1&origin=' + encodeURIComponent(location.origin)
-    : 'about:blank';
-  return `<iframe id="persistent-music-iframe" class="persistent-music-iframe" src="${src}" title="오늘의 노래" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
-}
-
-function initPersistentMusicPlayer(videoId){
-  const layer = document.getElementById('persistent-music-layer');
-  if(!layer) return;
-  let iframe = document.getElementById('persistent-music-iframe');
-  if(!iframe){
-    layer.innerHTML = persistentMusicIframeHtml(videoId || '');
-    iframe = document.getElementById('persistent-music-iframe');
-  }
-  if(window.YT && window.YT.Player && !state.musicPlayer.player){
-    state.musicPlayer.player = new YT.Player(iframe, {
-      events:{
-        onReady: () => {
-          state.musicPlayer.ready = true;
-          const pending = state.musicPlayer.pending;
-          state.musicPlayer.pending = null;
-          if(pending){
-            applyPersistentMusicAction(pending.type, pending.videoId, pending.autoplay);
-          }
-        },
-        onStateChange: (event) => {
-          if(typeof YT !== 'undefined'){
-            state.musicPlayer.playing = event.data === YT.PlayerState.PLAYING;
-          }
-          refreshMusicWidgetControls();
-        }
-      },
-      playerVars:{rel:0, modestbranding:1, playsinline:1, origin:location.origin}
-    });
-  }
-}
-
-function ensurePersistentMusicPlayer(videoId=''){
-  const layer = document.getElementById('persistent-music-layer');
-  if(!layer) return;
-  const iframe = document.getElementById('persistent-music-iframe');
-  if(!iframe || (videoId && !state.musicPlayer.player && iframe.src === 'about:blank')){
-    layer.innerHTML = persistentMusicIframeHtml(videoId);
-  }
-  if(!state.musicPlayer.player){
-    loadYouTubeIframeAPI().then(() => initPersistentMusicPlayer(videoId));
-  }
-}
-
-function applyPersistentMusicAction(type, videoId, autoplay){
-  ensurePersistentMusicPlayer(videoId);
-  const player = state.musicPlayer.player;
-  if(!player || !state.musicPlayer.ready){
-    state.musicPlayer.pending = {type, videoId, autoplay};
-    return;
-  }
-  if(type === 'load' && videoId){
-    state.musicPlayer.videoId = videoId;
-    if(autoplay) player.loadVideoById(videoId);
-    else player.cueVideoById(videoId);
-    return;
-  }
-  if(type === 'play') player.playVideo();
-  if(type === 'pause') player.pauseVideo();
-}
-
-function musicPlayerPlayTrack(date, index, autoplay=true){
-  const list = getMusicList(date);
-  if(!list.length) return;
-  const safeIndex = Math.max(0, Math.min(index, list.length-1));
-  state.musicDate = date;
-  state.musicSelectedIndex = safeIndex;
-  const track = list[safeIndex];
-  state.musicPlayer.videoId = track.videoId;
-  state.musicPlayer.playing = autoplay;
-  applyPersistentMusicAction('load', track.videoId, autoplay);
-  refreshMusicWidgetControls();
-}
-
-function musicPlayerToggle(date, index){
-  const list = getMusicList(date);
-  if(!list.length) return;
-  const track = list[Math.max(0, Math.min(index, list.length-1))];
-  if(state.musicPlayer.videoId === track.videoId && state.musicPlayer.ready && state.musicPlayer.player){
-    if(state.musicPlayer.playing) applyPersistentMusicAction('pause', track.videoId, false);
-    else applyPersistentMusicAction('play', track.videoId, true);
-    return;
-  }
-  musicPlayerPlayTrack(date, index, true);
-}
-
-function musicPlayerStep(date, delta){
-  const list = getMusicList(date);
-  if(!list.length) return;
-  const current = state.musicPlayer.videoId ? list.findIndex(t => t.videoId === state.musicPlayer.videoId) : -1;
-  const base = current >= 0 ? current : (Number.isInteger(state.musicSelectedIndex) ? state.musicSelectedIndex : 0);
-  const next = Math.max(0, Math.min(list.length-1, base + delta));
-  if(next === base && current >= 0) return;
-  musicPlayerPlayTrack(date, next, true);
-}
-
-function detachPersistentMusicPlayer(){
-  const layer = document.getElementById('persistent-music-layer');
-  const iframe = document.getElementById('persistent-music-iframe');
-  if(!layer || !iframe) return;
-  if(iframe.parentElement !== layer) layer.appendChild(iframe);
-  layer.classList.remove('music-player-visible');
-  layer.setAttribute('aria-hidden','true');
-}
-
-function attachPersistentMusicPlayer(){
-  const layer = document.getElementById('persistent-music-layer');
-  if(!layer) return;
-  const iframe = document.getElementById('persistent-music-iframe');
-  if(!iframe) return;
-  const slot = document.getElementById('persistent-music-slot');
-  if(slot){
-    slot.appendChild(iframe);
-    layer.classList.add('music-player-visible');
-    layer.setAttribute('aria-hidden','false');
-  }else{
-    layer.appendChild(iframe);
-    layer.classList.remove('music-player-visible');
-    layer.setAttribute('aria-hidden','true');
-  }
-}
-
-function refreshMusicWidgetControls(){
-  document.querySelectorAll('[data-music-widget-play]').forEach(btn => {
-    const date = todayStr();
-    const list = getMusicList(date);
-    if(!list.length) return;
-    const idx = state.musicPlayer.videoId ? list.findIndex(t=>t.videoId===state.musicPlayer.videoId) : 0;
-    const active = idx >= 0 ? idx : 0;
-    btn.textContent = (state.musicPlayer.playing && state.musicPlayer.videoId===list[active]?.videoId) ? 'Ⅱ' : '▶';
-    btn.setAttribute('aria-label', state.musicPlayer.playing ? '일시정지' : '재생');
-  });
-}
-
 function getMusicPlaylists(){
   return state.musicPlaylists && typeof state.musicPlaylists === 'object' ? state.musicPlaylists : {};
 }
@@ -1047,6 +870,127 @@ function youtubeEmbed(videoId, autoplay=false){
   const params = `rel=0&modestbranding=1&playsinline=1${autoplay?'&autoplay=1':''}`;
   return `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?${params}`;
 }
+
+/* 전역 YouTube 플레이어: 화면 렌더링과 분리해 페이지 이동 중에도 재생을 유지한다. */
+let globalMusicPlayer = null;
+let globalMusicPlayerReady = false;
+let pendingMusicAction = null;
+
+function initGlobalMusicPlayer(){
+  if(globalMusicPlayer || !window.YT || !YT.Player) return;
+  globalMusicPlayer = new YT.Player('global-music-youtube', {
+    width:'320', height:'180',
+    playerVars:{ rel:0, modestbranding:1, playsinline:1 },
+    events:{
+      onReady: () => {
+        globalMusicPlayerReady = true;
+        if(pendingMusicAction){ const fn = pendingMusicAction; pendingMusicAction = null; fn(); }
+      },
+      onStateChange: (event) => {
+        if(event.data === YT.PlayerState.PLAYING){ state.musicIsPlaying = true; syncMusicPlaybackUi(); }
+        else if(event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.CUED){ state.musicIsPlaying = false; syncMusicPlaybackUi(); }
+        else if(event.data === YT.PlayerState.ENDED){ playNextMusicTrack(); }
+      }
+    }
+  });
+}
+
+window.onYouTubeIframeAPIReady = initGlobalMusicPlayer;
+if(window.YT && YT.Player) initGlobalMusicPlayer();
+
+function runWhenMusicPlayerReady(fn){
+  if(globalMusicPlayerReady && globalMusicPlayer){ fn(); return; }
+  pendingMusicAction = fn;
+  initGlobalMusicPlayer();
+}
+
+function currentPlaybackTrack(){
+  const date = state.musicPlaybackDate;
+  if(!date) return null;
+  const list = getMusicList(date);
+  return list[state.musicPlaybackIndex] || null;
+}
+
+function playMusicTrack(date, index){
+  const list = getMusicList(date);
+  if(!list.length) return;
+  const safeIndex = ((Number(index)||0) % list.length + list.length) % list.length;
+  const track = list[safeIndex];
+  state.musicPlaybackDate = date;
+  state.musicPlaybackIndex = safeIndex;
+  if(state.musicDate === date) state.musicSelectedIndex = safeIndex;
+  runWhenMusicPlayerReady(() => {
+    globalMusicPlayer.loadVideoById(track.videoId);
+    state.musicIsPlaying = true;
+    syncMusicPlaybackUi();
+  });
+}
+
+function toggleMusicPlayback(date, index){
+  const sameTrack = state.musicPlaybackDate === date && state.musicPlaybackIndex === index;
+  if(!sameTrack){ playMusicTrack(date, index); return; }
+  runWhenMusicPlayerReady(() => {
+    const ps = globalMusicPlayer.getPlayerState();
+    if(ps === YT.PlayerState.PLAYING){ globalMusicPlayer.pauseVideo(); }
+    else { globalMusicPlayer.playVideo(); }
+  });
+}
+
+function playNextMusicTrack(){
+  const date = state.musicPlaybackDate;
+  if(!date) return;
+  const list = getMusicList(date);
+  if(!list.length) return;
+  const next = (state.musicPlaybackIndex + 1) % list.length;
+  playMusicTrack(date, next);
+  if(state.view === 'music') renderMusicPage();
+}
+
+function syncMusicPlayerPosition(){
+  const shell = document.getElementById('global-music-player-shell');
+  const anchor = document.getElementById('music-player-anchor');
+  if(!shell) return;
+  if(state.view !== 'music' || !anchor){
+    shell.classList.remove('is-visible');
+    shell.style.left = '-10000px';
+    return;
+  }
+  const rect = anchor.getBoundingClientRect();
+  if(rect.width < 20 || rect.height < 20){
+    shell.classList.remove('is-visible');
+    return;
+  }
+  shell.style.left = `${Math.round(rect.left)}px`;
+  shell.style.top = `${Math.round(rect.top)}px`;
+  shell.style.width = `${Math.round(rect.width)}px`;
+  shell.style.height = `${Math.round(rect.height)}px`;
+  shell.classList.add('is-visible');
+}
+
+let musicPlayerPositionFrame = null;
+function scheduleMusicPlayerPosition(){
+  if(musicPlayerPositionFrame) return;
+  musicPlayerPositionFrame = requestAnimationFrame(() => {
+    musicPlayerPositionFrame = null;
+    syncMusicPlayerPosition();
+  });
+}
+window.addEventListener('resize', scheduleMusicPlayerPosition);
+window.addEventListener('scroll', scheduleMusicPlayerPosition, {passive:true});
+
+function syncMusicPlaybackUi(){
+  const playing = !!state.musicIsPlaying;
+  const main = document.getElementById('music-play');
+  if(main){ main.textContent = playing ? '❚❚' : '▶'; main.title = playing ? '일시정지' : '재생'; }
+  document.querySelectorAll('[data-music-mini-play]').forEach(btn => {
+    const date = btn.getAttribute('data-music-date');
+    const index = Number(btn.getAttribute('data-music-index')) || 0;
+    const active = state.musicPlaybackDate === date && state.musicPlaybackIndex === index && playing;
+    btn.textContent = active ? '❚❚' : '▶';
+    btn.setAttribute('aria-label', active ? '일시정지' : '재생');
+  });
+  scheduleMusicPlayerPosition();
+}
 function musicDateLabel(date){
   const [y,m,d] = date.split('-').map(Number);
   return `${y}. ${m}. ${d}`;
@@ -1068,7 +1012,7 @@ function musicCardHtml(date){
 
       ${current ? `
         <div class="music-player">
-          <div id="persistent-music-slot" style="width:100%;height:100%;"></div>
+          <div class="music-player-anchor" id="music-player-anchor" aria-label="YouTube 영상 플레이어"></div>
         </div>
         <div class="text-center mt-3">
           <p class="font-semibold text-base" style="color:var(--text)">${escapeHtml(current.title)}</p>
@@ -1106,7 +1050,6 @@ function musicCardHtml(date){
       <div class="music-management">
         <div class="flex items-center justify-between gap-2 mb-3">
           <p class="text-sm font-semibold" style="color:var(--text)">플레이리스트 관리</p>
-          <span class="text-[11px]" style="color:var(--text-muted)">Supabase 저장</span>
         </div>
 
         <div class="music-date-nav mb-3">
@@ -1116,23 +1059,17 @@ function musicCardHtml(date){
         </div>
 
         <form id="music-add-form" class="space-y-2">
-          <input id="music-url" type="url" class="music-input" placeholder="YouTube URL만 붙여넣어 주세요" required>
-          <button type="button" id="music-fetch-info" class="btn-ghost w-full !py-2.5 text-sm">🔍 노래 정보 자동으로 가져오기</button>
-          <div id="music-auto-info" class="hidden mt-2 p-3 rounded-xl" style="background:var(--bg-soft);border:1px solid var(--border-soft);">
-            <div class="flex items-center gap-3">
-              <img id="music-auto-thumb" class="w-16 h-12 rounded-lg object-cover" alt="" style="background:var(--surface);">
-              <div class="min-w-0 flex-1">
-                <p id="music-auto-title" class="text-sm font-semibold truncate" style="color:var(--text)"></p>
-                <p id="music-auto-artist" class="text-xs mt-1 truncate" style="color:var(--text-muted)"></p>
-              </div>
-            </div>
+          <input id="music-url" type="url" class="music-input" placeholder="YouTube URL을 붙여넣어 주세요" required>
+          <div class="grid grid-cols-2 gap-2">
+            <input id="music-title" type="text" class="music-input" placeholder="곡 제목" required>
+            <input id="music-artist" type="text" class="music-input" placeholder="가수 / 아티스트">
           </div>
-          <button type="submit" id="music-add-submit" class="btn-primary w-full !py-2.5 text-sm">＋ 이 날짜에 곡 추가하기</button>
+          <button type="submit" class="btn-primary w-full !py-2.5 text-sm">＋ 이 날짜에 곡 추가하기</button>
         </form>
 
         ${list.length ? `
           <div class="mt-4 pt-3" style="border-top:1px solid var(--border-soft);">
-            <p class="text-xs mb-2" style="color:var(--text-muted)">등록된 곡의 순서를 바꾸거나 정보를 수정·삭제할 수 있어요.</p>
+            <p class="text-xs mb-2" style="color:var(--text-muted)">등록된 곡의 순서를 바꾸거나 삭제할 수 있어요.</p>
             <div class="space-y-1">
               ${list.map((track,i)=>`
                 <div class="flex items-center gap-2 py-1.5">
@@ -1140,7 +1077,6 @@ function musicCardHtml(date){
                   <span class="text-xs flex-1 truncate" style="color:var(--text)">${escapeHtml(track.title)}</span>
                   <button type="button" class="text-xs px-2 py-1 rounded-full" data-music-up="${i}" ${i===0?'disabled':''} style="color:var(--text-muted);background:var(--bg-soft);">↑</button>
                   <button type="button" class="text-xs px-2 py-1 rounded-full" data-music-down="${i}" ${i===list.length-1?'disabled':''} style="color:var(--text-muted);background:var(--bg-soft);">↓</button>
-                  <button type="button" class="text-xs px-2 py-1 rounded-full" data-music-edit="${i}" style="color:var(--text);background:var(--bg-soft);">수정</button>
                   <button type="button" class="text-xs px-2 py-1 rounded-full" data-music-delete="${i}" style="color:var(--accent-red);background:rgba(255,139,139,.1);">삭제</button>
                 </div>
               `).join('')}
@@ -1174,9 +1110,9 @@ function wireMusicCard(date){
 
   document.querySelectorAll('[data-music-index]').forEach(el => {
     const selectTrack = () => {
-      const idx = Number(el.getAttribute('data-music-index')) || 0;
-      state.musicSelectedIndex = idx;
-      musicPlayerPlayTrack(date, idx, true);
+      const nextIndex = Number(el.getAttribute('data-music-index')) || 0;
+      state.musicSelectedIndex = nextIndex;
+      if(state.musicIsPlaying) playMusicTrack(date, nextIndex);
       renderMusicPage();
     };
     el.addEventListener('click', selectTrack);
@@ -1186,18 +1122,18 @@ function wireMusicCard(date){
   });
 
   document.getElementById('music-prev')?.addEventListener('click', () => {
-    musicPlayerStep(date, -1);
     state.musicSelectedIndex = Math.max(0, (state.musicSelectedIndex||0)-1);
+    if(state.musicIsPlaying) playMusicTrack(date, state.musicSelectedIndex);
     renderMusicPage();
   });
   document.getElementById('music-next')?.addEventListener('click', () => {
     const list = getMusicList(date);
-    musicPlayerStep(date, 1);
     state.musicSelectedIndex = Math.min(list.length-1, (state.musicSelectedIndex||0)+1);
+    if(state.musicIsPlaying) playMusicTrack(date, state.musicSelectedIndex);
     renderMusicPage();
   });
   document.getElementById('music-play')?.addEventListener('click', () => {
-    musicPlayerToggle(date, state.musicSelectedIndex||0);
+    toggleMusicPlayback(date, state.musicSelectedIndex || 0);
   });
 
   document.querySelectorAll('[data-music-up],[data-music-down]').forEach(btn => {
@@ -1220,97 +1156,6 @@ function wireMusicCard(date){
         console.error(err);
         showToast('순서 저장에 실패했어요. Supabase 설정을 확인해주세요.');
       }
-    });
-  });
-
-  document.querySelectorAll('[data-music-edit]').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      const index = Number(btn.getAttribute('data-music-edit'));
-      const list = getMusicList(date);
-      const track = list[index];
-      if(!track || !state.userId) return;
-
-      const root = document.getElementById('modal-root');
-      root.innerHTML = `
-        <div class="modal-overlay" id="music-edit-overlay">
-          <div class="modal-box fade-in" style="max-width:460px;">
-            <h3 class="font-hand text-2xl mb-1" style="color:var(--text)">노래 정보 수정</h3>
-            <p class="text-xs mb-5" style="color:var(--text-muted)">제목, 가수, YouTube 링크를 수정할 수 있어요.</p>
-            <div class="space-y-2.5">
-              <input id="music-edit-url" type="url" class="music-input" value="${escapeHtml(`https://www.youtube.com/watch?v=${track.videoId}`)}" placeholder="YouTube URL">
-              <button type="button" id="music-edit-fetch" class="btn-ghost w-full !py-2.5 text-sm">🔍 YouTube 정보 다시 가져오기</button>
-              <input id="music-edit-title" type="text" class="music-input" value="${escapeHtml(track.title)}" placeholder="곡 제목">
-              <input id="music-edit-artist" type="text" class="music-input" value="${escapeHtml(track.artist || '')}" placeholder="가수 / 아티스트">
-            </div>
-            <div class="flex justify-end gap-2 mt-5">
-              <button type="button" id="music-edit-cancel" class="btn-ghost text-sm">취소</button>
-              <button type="button" id="music-edit-save" class="text-sm px-5 py-2 rounded-full font-semibold" style="background:var(--text);color:var(--bg);">저장</button>
-            </div>
-          </div>
-        </div>`;
-
-      const overlay = document.getElementById('music-edit-overlay');
-      requestAnimationFrame(() => overlay.classList.add('show'));
-      const close = () => {
-        overlay.classList.remove('show');
-        setTimeout(() => root.innerHTML = '', 200);
-      };
-      document.getElementById('music-edit-cancel').onclick = close;
-      overlay.onclick = ev => { if(ev.target === overlay) close(); };
-
-      document.getElementById('music-edit-fetch').onclick = async () => {
-        const fetchBtn = document.getElementById('music-edit-fetch');
-        const url = document.getElementById('music-edit-url').value.trim();
-        const videoId = extractYoutubeVideoId(url);
-        if(!videoId){ showToast('올바른 YouTube 링크를 입력해주세요.'); return; }
-        const original = fetchBtn.textContent;
-        fetchBtn.disabled = true;
-        fetchBtn.textContent = '⏳ 정보를 가져오는 중...';
-        try{
-          const endpoint = `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}&format=json`;
-          const res = await fetch(endpoint);
-          if(!res.ok) throw new Error('YouTube oEmbed 요청 실패');
-          const data = await res.json();
-          document.getElementById('music-edit-title').value = data.title || '';
-          document.getElementById('music-edit-artist').value = data.author_name || '';
-          showToast('YouTube 정보를 가져왔어요 🎵');
-        }catch(err){
-          console.error(err);
-          showToast('YouTube 정보를 가져오지 못했어요.');
-        }finally{
-          fetchBtn.disabled = false;
-          fetchBtn.textContent = original;
-        }
-      };
-
-      document.getElementById('music-edit-save').onclick = async () => {
-        const saveBtn = document.getElementById('music-edit-save');
-        const url = document.getElementById('music-edit-url').value.trim();
-        const newVideoId = extractYoutubeVideoId(url);
-        const newTitle = document.getElementById('music-edit-title').value.trim();
-        const newArtist = document.getElementById('music-edit-artist').value.trim();
-        if(!newVideoId){ showToast('올바른 YouTube 링크를 입력해주세요.'); return; }
-        if(!newTitle){ showToast('곡 제목을 입력해주세요.'); return; }
-        if(list.some((x,i) => i!==index && x.videoId===newVideoId)){ showToast('이미 이 날짜에 등록된 곡이에요.'); return; }
-        saveBtn.disabled = true;
-        saveBtn.textContent = '저장 중...';
-        try{
-          const updated = await DB.updateMusic({ ...track, videoId:newVideoId, title:newTitle, artist:newArtist }, state.userId);
-          const next = list.slice();
-          next[index] = updated;
-          setMusicList(date, next);
-          state.musicSelectedIndex = index;
-          close();
-          showToast('노래 정보를 수정했어요 🎵');
-          renderMusicPage();
-        }catch(err){
-          console.error(err);
-          saveBtn.disabled = false;
-          saveBtn.textContent = '저장';
-          showToast('노래 정보 수정에 실패했어요.');
-        }
-      };
     });
   });
 
@@ -1343,79 +1188,15 @@ function wireMusicCard(date){
     });
   });
 
-  let fetchedMusicInfo = null;
-
-  async function fetchYoutubeMusicInfo(){
-    const urlInput = document.getElementById('music-url');
-    const button = document.getElementById('music-fetch-info');
-    const infoBox = document.getElementById('music-auto-info');
-    const titleEl = document.getElementById('music-auto-title');
-    const artistEl = document.getElementById('music-auto-artist');
-    const thumbEl = document.getElementById('music-auto-thumb');
-    if(!urlInput || !button) return null;
-
-    const url = urlInput.value.trim();
-    const videoId = extractYoutubeVideoId(url);
-    if(!videoId){ showToast('올바른 YouTube 링크를 입력해주세요.'); return null; }
-
-    const original = button.textContent;
-    button.disabled = true;
-    button.textContent = '⏳ 노래 정보를 가져오는 중...';
-    try{
-      // YouTube oEmbed를 사용하므로 별도의 YouTube API 키가 필요하지 않아요.
-      const endpoint = `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}&format=json`;
-      const res = await fetch(endpoint);
-      if(!res.ok) throw new Error('YouTube oEmbed 요청 실패');
-      const data = await res.json();
-      fetchedMusicInfo = {
-        videoId,
-        title: data.title || '',
-        artist: data.author_name || '',
-        thumbnail: data.thumbnail_url || youtubeThumb(videoId)
-      };
-      if(titleEl) titleEl.textContent = fetchedMusicInfo.title;
-      if(artistEl) artistEl.textContent = fetchedMusicInfo.artist ? `채널 · ${fetchedMusicInfo.artist}` : '가수/채널 정보 없음';
-      if(thumbEl) thumbEl.src = fetchedMusicInfo.thumbnail;
-      infoBox?.classList.remove('hidden');
-      showToast('노래 정보를 자동으로 가져왔어요 🎵');
-      return fetchedMusicInfo;
-    }catch(err){
-      console.error('YouTube info fetch failed:', err);
-      fetchedMusicInfo = null;
-      infoBox?.classList.add('hidden');
-      showToast('YouTube 정보를 가져오지 못했어요. 링크를 확인해주세요.');
-      return null;
-    }finally{
-      button.disabled = false;
-      button.textContent = original;
-    }
-  }
-
-  document.getElementById('music-url')?.addEventListener('change', () => {
-    fetchedMusicInfo = null;
-    document.getElementById('music-auto-info')?.classList.add('hidden');
-  });
-  document.getElementById('music-url')?.addEventListener('paste', () => {
-    setTimeout(() => { fetchYoutubeMusicInfo(); }, 120);
-  });
-  document.getElementById('music-fetch-info')?.addEventListener('click', fetchYoutubeMusicInfo);
-
   document.getElementById('music-add-form')?.addEventListener('submit', async e => {
     e.preventDefault();
     if(!state.userId){ showToast('로그인 후 노래를 저장할 수 있어요.'); return; }
     const url = document.getElementById('music-url').value.trim();
+    const title = document.getElementById('music-title').value.trim();
+    const artist = document.getElementById('music-artist').value.trim();
     const videoId = extractYoutubeVideoId(url);
     if(!videoId){ showToast('올바른 YouTube 링크를 입력해주세요.'); return; }
-
-    if(!fetchedMusicInfo || fetchedMusicInfo.videoId !== videoId){
-      fetchedMusicInfo = await fetchYoutubeMusicInfo();
-      if(!fetchedMusicInfo) return;
-    }
-
-    const title = fetchedMusicInfo.title.trim();
-    const artist = (fetchedMusicInfo.artist || '').trim();
-    if(!title){ showToast('YouTube에서 제목을 가져오지 못했어요.'); return; }
-
+    if(!title){ showToast('곡 제목을 입력해주세요.'); return; }
     const list = getMusicList(date).slice();
     if(list.some(x=>x.videoId===videoId)){ showToast('이미 이 날짜에 등록된 곡이에요.'); return; }
 
@@ -2311,7 +2092,9 @@ const state = {
   musicPlaylists: {},
   musicDate: todayStr(),
   musicSelectedIndex: 0,
-  musicPlayer: { player:null, ready:false, videoId:null, playing:false, pending:null, apiLoading:false },
+  musicPlaybackDate: null,
+  musicPlaybackIndex: 0,
+  musicIsPlaying: false,
   quoteTimer: null,
 };
 
@@ -2475,28 +2258,26 @@ function renderShell(innerHtml){
       else { nav(target); }
     });
   });
+  app.querySelectorAll('[data-music-mini-play]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const date = btn.getAttribute('data-music-date') || todayStr();
+      const index = Number(btn.getAttribute('data-music-index')) || 0;
+      toggleMusicPlayback(date, index);
+    });
+  });
   app.querySelectorAll('[data-open-music-widget]').forEach(el => {
-    const openMusic = () => nav('music');
+    const openMusic = (e) => {
+      if(e && e.target.closest('[data-music-mini-play]')) return;
+      nav('music');
+    };
     el.addEventListener('click', openMusic);
     el.addEventListener('keydown', e => {
-      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openMusic(); }
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); nav('music'); }
     });
   });
-  app.querySelectorAll('[data-music-widget-prev]').forEach(btn => {
-    btn.addEventListener('click', e => { e.stopPropagation(); musicPlayerStep(todayStr(), -1); renderApp(); });
-  });
-  app.querySelectorAll('[data-music-widget-next]').forEach(btn => {
-    btn.addEventListener('click', e => { e.stopPropagation(); musicPlayerStep(todayStr(), 1); renderApp(); });
-  });
-  app.querySelectorAll('[data-music-widget-play]').forEach(btn => {
-    btn.addEventListener('click', e => { e.stopPropagation();
-      const list = getMusicList(todayStr());
-      if(!list.length) return;
-      const idx = state.musicPlayer.videoId ? Math.max(0,list.findIndex(t=>t.videoId===state.musicPlayer.videoId)) : 0;
-      musicPlayerToggle(todayStr(), idx);
-      refreshMusicWidgetControls();
-    });
-  });
+  syncMusicPlaybackUi();
   wireMiniCalendar();
   wireTodoWidgets();
   document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
@@ -2672,19 +2453,18 @@ function renderAuth(){
 
 /* ---------------- 라우터 ---------------- */
 function renderApp(){
-  detachPersistentMusicPlayer();
-  if(state.booting || state.bootError){ renderBoot(); attachPersistentMusicPlayer(); return; }
-  if(state.view === 'auth'){ renderAuth(); attachPersistentMusicPlayer(); return; }
-  if(state.view === 'home'){ renderHome(); attachPersistentMusicPlayer(); return; }
-  if(state.view === 'write'){ renderWrite(); attachPersistentMusicPlayer(); return; }
-  if(state.view === 'list'){ renderList(); attachPersistentMusicPlayer(); return; }
-  if(state.view === 'calendar'){ renderCalendarPage(); attachPersistentMusicPlayer(); return; }
-  if(state.view === 'fortune'){ renderFortunePage(); attachPersistentMusicPlayer(); return; }
-  if(state.view === 'music'){ renderMusicPage(); attachPersistentMusicPlayer(); return; }
-  if(state.view === 'detail'){ renderDetail(); attachPersistentMusicPlayer(); return; }
-  if(state.view === 'stats'){ renderStats(); attachPersistentMusicPlayer(); return; }
-  if(state.view === 'travelmap'){ renderTravelMap(); attachPersistentMusicPlayer(); return; }
-  renderHome(); attachPersistentMusicPlayer();
+  if(state.booting || state.bootError){ renderBoot(); return; }
+  if(state.view === 'auth') return renderAuth();
+  if(state.view === 'home') return renderHome();
+  if(state.view === 'write') return renderWrite();
+  if(state.view === 'list') return renderList();
+  if(state.view === 'calendar') return renderCalendarPage();
+  if(state.view === 'fortune') return renderFortunePage();
+  if(state.view === 'music') return renderMusicPage();
+  if(state.view === 'detail') return renderDetail();
+  if(state.view === 'stats') return renderStats();
+  if(state.view === 'travelmap') return renderTravelMap();
+  renderHome();
 }
 
 /* ============================================================
@@ -2757,35 +2537,30 @@ function wireMiniCalendar(){
 function musicMiniWidgetHtml(){
   const date = todayStr();
   const list = getMusicList(date);
-  const activeIndex = state.musicPlayer.videoId ? list.findIndex(t=>t.videoId===state.musicPlayer.videoId) : 0;
-  const selected = activeIndex >= 0 ? activeIndex : 0;
-  const current = list[selected] || list[0];
+  const activeToday = state.musicPlaybackDate === date && list[state.musicPlaybackIndex];
+  const index = activeToday ? state.musicPlaybackIndex : 0;
+  const first = list[index];
+  const isPlaying = !!(activeToday && state.musicIsPlaying);
   return `
-    <div class="music-mini-widget paper-card p-3" aria-label="오늘의 노래">
+    <div class="music-mini-widget paper-card p-3" role="button" tabindex="0" aria-label="오늘의 노래 열기" data-open-music-widget>
       <div class="flex items-center justify-between gap-2 mb-2">
-        <button type="button" class="music-mini-title-btn" data-open-music-widget>
-          <h3 class="font-hand text-lg truncate" style="color:var(--text)">오늘의 노래</h3>
-        </button>
+        <div class="flex items-center gap-1.5 min-w-0">
+          <h3 class="font-hand text-lg mb-3 truncate" style="color:var(--text)">오늘의 노래</h3>
+        </div>
         <span class="text-[10px] px-2 py-0.5 rounded-full" style="background:var(--bg-soft);color:var(--text-muted)">${list.length}곡</span>
       </div>
-      ${current ? `
+      ${first ? `
         <div class="music-mini-row">
-          <img src="${youtubeThumb(current.videoId)}" alt="" class="music-mini-thumb">
-          <button type="button" class="min-w-0 flex-1" data-open-music-widget style="background:none;border:0;padding:0;text-align:left;">
-            <p class="text-xs font-semibold truncate" style="color:var(--text)">${escapeHtml(current.title)}</p>
-            <p class="text-[10px] truncate" style="color:var(--text-muted)">${escapeHtml(current.artist || 'YouTube')}</p>
-          </button>
+          <img src="${youtubeThumb(first.videoId)}" alt="" class="music-mini-thumb"> 
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-semibold truncate" style="color:var(--text)">${escapeHtml(first.title)}</p>
+            <p class="text-[10px] truncate" style="color:var(--text-muted)">${escapeHtml(first.artist || 'YouTube')}</p>
+          </div>
+          <button type="button" class="music-mini-play" data-music-mini-play data-music-date="${date}" data-music-index="${index}" aria-label="${isPlaying?'일시정지':'재생'}">${isPlaying?'❚❚':'▶'}</button>
         </div>
-        <div class="music-mini-controls">
-          <button type="button" class="music-mini-control" data-music-widget-prev aria-label="이전 곡">◀</button>
-          <button type="button" class="music-mini-control music-mini-control-main" data-music-widget-play aria-label="재생">${state.musicPlayer.playing && state.musicPlayer.videoId===current.videoId ? 'Ⅱ':'▶'}</button>
-          <button type="button" class="music-mini-control" data-music-widget-next aria-label="다음 곡">▶</button>
-          <span class="text-[10px] ml-1 truncate" style="color:var(--text-muted)">${selected+1} / ${list.length}</span>
-        </div>
+        ${list.length>1 ? `<p class="text-[10px] mt-2" style="color:var(--text-muted)">외 ${list.length-1}곡 더 있어요</p>` : ''}
       ` : `
-        <button type="button" class="text-left w-full" data-open-music-widget style="background:none;border:0;padding:0;">
-          <p class="text-[11px] leading-relaxed" style="color:var(--text-muted)">오늘의 노래를 아직 넣지 않았어요.<br>눌러서 플레이리스트를 만들어보세요.</p>
-        </button>
+        <p class="text-[11px] leading-relaxed" style="color:var(--text-muted)">오늘의 노래를 아직 넣지 않았어요.<br>눌러서 플레이리스트를 만들어보세요.</p>
       `}
     </div>`;
 }
@@ -2811,9 +2586,23 @@ function renderMusicPage(){
     </section>`;
 
   renderShell(html);
-  ensurePersistentMusicPlayer(current?.videoId || state.musicPlayer.videoId || '');
   wireMusicCard(date);
-  attachPersistentMusicPlayer();
+
+  // 음악 페이지에서는 앱 안의 플레이어 자리 위에 '전역' YouTube 플레이어를 배치한다.
+  // 페이지 이동 시에도 전역 플레이어 자체는 제거되지 않으므로 재생이 끊기지 않는다.
+  const selected = Math.min(
+    Math.max(Number.isInteger(state.musicSelectedIndex) ? state.musicSelectedIndex : 0, 0),
+    Math.max(list.length - 1, 0)
+  );
+  const current = list[selected] || null;
+  runWhenMusicPlayerReady(() => {
+    const sameTrack = state.musicPlaybackDate === date && state.musicPlaybackIndex === selected;
+    if(current && !sameTrack && !state.musicIsPlaying){
+      globalMusicPlayer.cueVideoById(current.videoId);
+    }
+    scheduleMusicPlayerPosition();
+  });
+  scheduleMusicPlayerPosition();
 
 }
 
