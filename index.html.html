@@ -673,7 +673,45 @@ const DB = (() => {
       if(error) throw error;
     }
   }
+  
+  const MEDS_TABLE = 'medicines';
+  async function fetchMedicines(userId){
+    const { data, error } = await sbClient.from(MEDS_TABLE).select('date, content').eq('user_id', userId);
+    if(error) throw error;
+    const map = {};
+    (data||[]).forEach(row => { if(row.content) map[row.date] = parseTodoContent(row.content); });
+    return map;
+  }
+  async function saveMedicine(userId, date, text){
+    if(text && text.trim()){
+      const { error } = await sbClient.from(MEDS_TABLE)
+        .upsert({ user_id: userId, date, content: text, updated_at: new Date().toISOString() }, { onConflict: 'user_id,date' });
+      if(error) throw error;
+    } else {
+      const { error } = await sbClient.from(MEDS_TABLE).delete().eq('user_id', userId).eq('date', date);
+      if(error) throw error;
+    }
+  }
 
+  const EXERCISE_TABLE = 'exercises';
+  async function fetchExercises(userId){
+    const { data, error } = await sbClient.from(EXERCISE_TABLE).select('date, content').eq('user_id', userId);
+    if(error) throw error;
+    const map = {};
+    (data||[]).forEach(row => { if(row.content) map[row.date] = parseTodoContent(row.content); });
+    return map;
+  }
+  async function saveExercise(userId, date, text){
+    if(text && text.trim()){
+      const { error } = await sbClient.from(EXERCISE_TABLE)
+        .upsert({ user_id: userId, date, content: text, updated_at: new Date().toISOString() }, { onConflict: 'user_id,date' });
+      if(error) throw error;
+    } else {
+      const { error } = await sbClient.from(EXERCISE_TABLE).delete().eq('user_id', userId).eq('date', date);
+      if(error) throw error;
+    }
+  }
+  
   const TRAVEL_TABLE = 'travel_pins';
   function pinToRow(p, userId){
     return {
@@ -2140,6 +2178,8 @@ const state = {
   homeCalCursor: new Date(),
   homeAnchorDate: todayStr(),
   todos: {},
+  medicines: {},
+  exercises: {},
   weatherData: null,
   weatherLoading: false,
   weatherError: null,
@@ -2443,6 +2483,18 @@ async function afterAuth(user){
     state.todos = {};
   }
   try{
+    state.medicines = await DB.fetchMedicines(user.id);
+  }catch(err){
+    console.error('medicines fetch failed (medicines 테이블이 아직 없을 수 있어요):', err);
+    state.medicines = {};
+  }
+  try{
+    state.exercises = await DB.fetchExercises(user.id);
+  }catch(err){
+    console.error('exercises fetch failed (exercises 테이블이 아직 없을 수 있어요):', err);
+    state.exercises = {};
+  }
+  try{
     state.travelPins = await DB.fetchTravelPins(user.id);
   }catch(err){
     console.error('travel pins fetch failed (travel_pins 테이블 또는 RLS를 확인하세요):', err);
@@ -2741,6 +2793,62 @@ function weatherWidgetHtml(){
 }
 
 /* ---------------- 홈 대시보드: 할 일 메모 위젯 (어제/오늘/내일) ---------------- */
+function medicineItemHtml(date, item){
+  return `
+    <div class="flex items-start gap-1.5" data-med-item-date="${date}">
+      <button type="button" data-med-toggle="${item.id}" title="${item.taken ? '복용 완료' : '복용 전'}"
+        style="width:22px;height:22px;flex-shrink:0;margin-top:1px;border-radius:50%;border:1.5px solid ${item.taken?'var(--brand-mint)':'var(--border)'};
+        background:${item.taken?'var(--brand-mint)':'transparent'};font-size:.85rem;display:flex;align-items:center;justify-content:center;">💊</button>
+      <textarea rows="1" class="med-item-text flex-1 text-xs bg-transparent" data-med-text="${item.id}"
+        style="color:${item.taken?'var(--text-muted)':'var(--text)'};text-decoration:${item.taken?'line-through':'none'};border:none;outline:none;resize:none;overflow:hidden;white-space:pre-wrap;word-break:break-word;line-height:1.4;padding:2px 0;">${escapeHtml(item.text)}</textarea>
+      <button type="button" class="text-xs" data-med-del="${item.id}" style="color:var(--text-muted);flex-shrink:0;margin-top:2px;">✕</button>
+    </div>`;
+}
+function exerciseItemHtml(date, item){
+  return `
+    <div class="flex items-start gap-1.5" data-ex-item-date="${date}">
+      <button type="button" data-ex-toggle="${item.id}" title="${item.done ? '운동 완료' : '운동 전'}"
+        style="width:22px;height:22px;flex-shrink:0;margin-top:1px;border-radius:50%;border:1.5px solid ${item.done?'var(--accent-pink)':'var(--border)'};
+        background:${item.done?'var(--accent-pink)':'transparent'};font-size:.85rem;display:flex;align-items:center;justify-content:center;">🏃</button>
+      <textarea rows="1" class="ex-item-text flex-1 text-xs bg-transparent" data-ex-text="${item.id}"
+        style="color:${item.done?'var(--text-muted)':'var(--text)'};text-decoration:${item.done?'line-through':'none'};border:none;outline:none;resize:none;overflow:hidden;white-space:pre-wrap;word-break:break-word;line-height:1.4;padding:2px 0;">${escapeHtml(item.text)}</textarea>
+      <button type="button" class="text-xs" data-ex-del="${item.id}" style="color:var(--text-muted);flex-shrink:0;margin-top:2px;">✕</button>
+    </div>`;
+}
+function medicineWidgetHtml(date){
+  const items = (state.medicines && state.medicines[date]) || [];
+  return `
+    <div class="paper-card p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h4 class="font-semibold" style="color:var(--text)">💊 복약 기록</h4>
+        <span class="text-xs" style="color:var(--text-muted)">약 이름을 적고 💊를 눌러 복용 표시</span>
+      </div>
+      <div class="space-y-1.5 mb-3" data-med-list="${date}">
+        ${items.length ? items.map(it=>medicineItemHtml(date,it)).join('') : `<p class="text-xs" style="color:var(--text-muted)">등록된 약이 없어요.</p>`}
+      </div>
+      <div class="flex gap-2">
+        <input type="text" class="med-new-input flex-1 text-sm px-3 py-2 rounded-xl" data-med-new="${date}" placeholder="약 이름을 입력해주세요" style="background:var(--bg-soft); border:1px solid var(--border-soft); color:var(--text);" />
+        <button type="button" class="text-sm px-4 py-2 rounded-xl font-semibold" data-med-add="${date}" style="background:var(--text); color:var(--bg);">추가</button>
+      </div>
+    </div>`;
+}
+function exerciseWidgetHtml(date){
+  const items = (state.exercises && state.exercises[date]) || [];
+  return `
+    <div class="paper-card p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h4 class="font-semibold" style="color:var(--text)">🏃 운동 기록</h4>
+        <span class="text-xs" style="color:var(--text-muted)">운동 종목을 적고 🏃를 눌러 완료 표시</span>
+      </div>
+      <div class="space-y-1.5 mb-3" data-ex-list="${date}">
+        ${items.length ? items.map(it=>exerciseItemHtml(date,it)).join('') : `<p class="text-xs" style="color:var(--text-muted)">등록된 운동이 없어요.</p>`}
+      </div>
+      <div class="flex gap-2">
+        <input type="text" class="ex-new-input flex-1 text-sm px-3 py-2 rounded-xl" data-ex-new="${date}" placeholder="운동 종목을 입력해주세요" style="background:var(--bg-soft); border:1px solid var(--border-soft); color:var(--text);" />
+        <button type="button" class="text-sm px-4 py-2 rounded-xl font-semibold" data-ex-add="${date}" style="background:var(--text); color:var(--bg);">추가</button>
+      </div>
+    </div>`;
+}
 function todoItemHtml(date, item){
   const s = TODO_STATUS[item.status] || TODO_STATUS.progress;
   return `
@@ -2784,7 +2892,128 @@ function todoWidgetsHtml(){
       </div>`;
   }).join('');
 }
+async function persistMedicineList(date, items){
+  try{
+    await DB.saveMedicine(state.userId, date, serializeTodoContent(items));
+    if(items.length){ state.medicines[date] = items; } else { delete state.medicines[date]; }
+  }catch(err){
+    console.error(err);
+    showToast('복약 기록 저장에 실패했어요: ' + (err && err.message ? err.message : '알 수 없는 오류'));
+  }
+}
+async function persistExerciseList(date, items){
+  try{
+    await DB.saveExercise(state.userId, date, serializeTodoContent(items));
+    if(items.length){ state.exercises[date] = items; } else { delete state.exercises[date]; }
+  }catch(err){
+    console.error(err);
+    showToast('운동 기록 저장에 실패했어요: ' + (err && err.message ? err.message : '알 수 없는 오류'));
+  }
+}
 
+function wireHealthWidgets(){
+  document.querySelectorAll('[data-med-toggle]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-med-toggle');
+      const date = btn.closest('[data-med-item-date]')?.getAttribute('data-med-item-date');
+      const items = (state.medicines[date] || []).slice();
+      const item = items.find(i => i.id === id);
+      if(!item) return;
+      item.taken = !item.taken;
+      state.medicines[date] = items;
+      await persistMedicineList(date, items);
+      renderApp();
+    });
+  });
+  document.querySelectorAll('.med-item-text').forEach(input => {
+    autoResizeTextarea(input);
+    const doSave = debounce(async (id, value) => {
+      const date = input.closest('[data-med-item-date]')?.getAttribute('data-med-item-date');
+      const items = state.medicines[date] || [];
+      const item = items.find(i => i.id === id);
+      if(!item) return;
+      item.text = value;
+      await persistMedicineList(date, items);
+    }, 600);
+    input.addEventListener('input', (e) => { autoResizeTextarea(input); doSave(input.getAttribute('data-med-text'), e.target.value); });
+  });
+  document.querySelectorAll('[data-med-del]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-med-del');
+      const date = btn.closest('[data-med-item-date]')?.getAttribute('data-med-item-date');
+      const items = (state.medicines[date] || []).filter(i => i.id !== id);
+      state.medicines[date] = items;
+      await persistMedicineList(date, items);
+      renderApp();
+    });
+  });
+  function addMedItem(date){
+    const input = document.querySelector(`[data-med-new="${date}"]`);
+    if(!input) return;
+    const text = input.value.trim();
+    if(!text) return;
+    const items = (state.medicines[date] || []).slice();
+    items.push({ id:newId(), text, taken:false });
+    state.medicines[date] = items;
+    input.value = '';
+    persistMedicineList(date, items).then(() => renderApp());
+  }
+  document.querySelectorAll('[data-med-add]').forEach(btn => btn.addEventListener('click', () => addMedItem(btn.getAttribute('data-med-add'))));
+  document.querySelectorAll('.med-new-input').forEach(input => {
+    input.addEventListener('keydown', (e) => { if(e.key === 'Enter'){ e.preventDefault(); addMedItem(input.getAttribute('data-med-new')); } });
+  });
+
+  document.querySelectorAll('[data-ex-toggle]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-ex-toggle');
+      const date = btn.closest('[data-ex-item-date]')?.getAttribute('data-ex-item-date');
+      const items = (state.exercises[date] || []).slice();
+      const item = items.find(i => i.id === id);
+      if(!item) return;
+      item.done = !item.done;
+      state.exercises[date] = items;
+      await persistExerciseList(date, items);
+      renderApp();
+    });
+  });
+  document.querySelectorAll('.ex-item-text').forEach(input => {
+    autoResizeTextarea(input);
+    const doSave = debounce(async (id, value) => {
+      const date = input.closest('[data-ex-item-date]')?.getAttribute('data-ex-item-date');
+      const items = state.exercises[date] || [];
+      const item = items.find(i => i.id === id);
+      if(!item) return;
+      item.text = value;
+      await persistExerciseList(date, items);
+    }, 600);
+    input.addEventListener('input', (e) => { autoResizeTextarea(input); doSave(input.getAttribute('data-ex-text'), e.target.value); });
+  });
+  document.querySelectorAll('[data-ex-del]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-ex-del');
+      const date = btn.closest('[data-ex-item-date]')?.getAttribute('data-ex-item-date');
+      const items = (state.exercises[date] || []).filter(i => i.id !== id);
+      state.exercises[date] = items;
+      await persistExerciseList(date, items);
+      renderApp();
+    });
+  });
+  function addExItem(date){
+    const input = document.querySelector(`[data-ex-new="${date}"]`);
+    if(!input) return;
+    const text = input.value.trim();
+    if(!text) return;
+    const items = (state.exercises[date] || []).slice();
+    items.push({ id:newId(), text, done:false });
+    state.exercises[date] = items;
+    input.value = '';
+    persistExerciseList(date, items).then(() => renderApp());
+  }
+  document.querySelectorAll('[data-ex-add]').forEach(btn => btn.addEventListener('click', () => addExItem(btn.getAttribute('data-ex-add'))));
+  document.querySelectorAll('.ex-new-input').forEach(input => {
+    input.addEventListener('keydown', (e) => { if(e.key === 'Enter'){ e.preventDefault(); addExItem(input.getAttribute('data-ex-new')); } });
+  });
+}
 async function persistTodoList(date, items){
   try{
     await DB.saveTodo(state.userId, date, serializeTodoContent(items));
@@ -4039,6 +4268,9 @@ function renderCalendar(){
             <input type="text" class="todo-new-input flex-1 text-sm px-3 py-2 rounded-xl" data-todo-new="${state.calendarSelectedDate}" placeholder="할 일을 입력해주세요" style="background:var(--bg-soft); border:1px solid var(--border-soft); color:var(--text);" />
             <button type="button" class="text-sm px-4 py-2 rounded-xl font-semibold" data-todo-add="${state.calendarSelectedDate}" style="background:var(--text); color:var(--bg);">추가</button>
           </div>
+        <div class="grid sm:grid-cols-2 gap-5 mt-5">
+          ${medicineWidgetHtml(state.calendarSelectedDate)}
+          ${exerciseWidgetHtml(state.calendarSelectedDate)}
         </div>
       ` : `<p class="text-sm" style="color:var(--text-muted)">날짜를 선택해 그날의 기록을 확인하고 추가해보세요.</p>`}
     </div>
@@ -4055,6 +4287,7 @@ function renderCalendar(){
     document.querySelector(`[data-todo-new="${state.calendarSelectedDate}"]`)?.focus();
   });
   wireTodoWidgets();
+  wireHealthWidgets();
   document.getElementById('cal-prev').addEventListener('click', () => { state.calendarCursor = new Date(year, month-1, 1); renderCalendar(); });
   document.getElementById('cal-next').addEventListener('click', () => { state.calendarCursor = new Date(year, month+1, 1); renderCalendar(); });
 }
